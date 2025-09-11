@@ -29,7 +29,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { user, logout } = useAuth();
   const { vehicles, paymentHistory } = useVehicle();
   const [notifications, setNotifications] = useState(true);
-  const [biometric, setBiometric] = useState(false);
   const theme = useTheme();
 
   const handleLogout = () => {
@@ -70,7 +69,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const handleAbout = () => {
     Alert.alert(
       'Sobre o App',
-      'Vehicle Rental App\nVersão 1.0.0\n\n© 2024 Vehicle Rental\nTodos os direitos reservados.',
+      'Nanquim Locações App\nVersão 1.0.0\n\n© 2024 Nanquim Locações\nTodos os direitos reservados.',
       [{ text: 'OK' }]
     );
   };
@@ -177,18 +176,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               )}
             />
             
-            <List.Item
-              title="Biometria"
-              description="Usar impressão digital ou Face ID para login"
-              left={(props) => <List.Icon {...props} icon="fingerprint" />}
-              right={() => (
-                <Switch
-                  value={biometric}
-                  onValueChange={setBiometric}
-                  color={theme.colors.primary}
-                />
-              )}
-            />
           </List.Section>
         </Card.Content>
       </Card>
@@ -249,7 +236,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
@@ -279,12 +266,12 @@ const styles = StyleSheet.create({
   },
   userEmail: {
     fontSize: 16,
-    color: '#666',
+    color: '#000000',
     marginBottom: 2,
   },
   userPhone: {
     fontSize: 16,
-    color: '#666',
+    color: '#000000',
   },
   editButton: {
     alignSelf: 'flex-start',
@@ -326,7 +313,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#000000',
     textAlign: 'center',
   },
   statDivider: {

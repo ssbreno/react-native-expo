@@ -19,6 +19,7 @@ import VehicleDetailScreen from './src/screens/VehicleDetailScreen';
 import PaymentHistoryScreen from './src/screens/PaymentHistoryScreen';
 import SubscriptionScreen from './src/screens/SubscriptionScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
 
 // Import types
 import { RootStackParamList, MainTabParamList } from './src/types';
@@ -27,13 +28,21 @@ import { RootStackParamList, MainTabParamList } from './src/types';
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Custom theme
+// Custom theme - Nanquim Locações (Black, Orange, White)
 const theme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: '#2196F3',
-    secondary: '#03DAC6',
+    primary: '#FF8C00', // Dark Orange
+    secondary: '#FFA500', // Orange
+    background: '#FFFFFF', // White
+    surface: '#FFFFFF', // White
+    accent: '#FF8C00', // Dark Orange
+    text: '#000000', // Black
+    placeholder: '#666666', // Dark Gray
+    backdrop: 'rgba(0, 0, 0, 0.5)', // Black backdrop
+    onSurface: '#000000', // Black text on surfaces
+    notification: '#FF8C00', // Orange for notifications
   },
 };
 
@@ -103,9 +112,9 @@ function MainTabNavigator() {
 }
 
 function AppNavigator() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
-  console.log('🚀 AppNavigator - Auth Status:', { isAuthenticated, loading });
+  console.log('🚀 AppNavigator - Auth Status:', { isAuthenticated, loading, user: user?.email, isAdmin: user?.is_admin });
 
   if (loading) {
     console.log('🚀 AppNavigator - Showing loading state');
@@ -132,7 +141,36 @@ function AppNavigator() {
           component={LoginScreen}
           options={{ headerShown: false }}
         />
+      ) : user?.is_admin === true ? (
+        // Admin Navigation
+        <>
+          <Stack.Screen 
+            name="AdminDashboard" 
+            component={AdminDashboardScreen}
+            options={{ 
+              title: 'Painel Administrativo',
+              headerBackTitle: 'Voltar'
+            }}
+          />
+          <Stack.Screen 
+            name="UsersList" 
+            component={require('./src/screens/UsersListScreen').default}
+            options={{ 
+              title: 'Lista de Usuários',
+              headerBackTitle: 'Voltar'
+            }}
+          />
+          <Stack.Screen 
+            name="UserDetails" 
+            component={require('./src/screens/UserDetailsScreen').default}
+            options={{ 
+              title: 'Detalhes do Usuário',
+              headerBackTitle: 'Voltar'
+            }}
+          />
+        </>
       ) : (
+        // Regular User Navigation
         <>
           <Stack.Screen 
             name="Main" 
@@ -144,6 +182,22 @@ function AppNavigator() {
             component={VehicleDetailScreen}
             options={{ 
               title: 'Detalhes do Veículo',
+              headerBackTitle: 'Voltar'
+            }}
+          />
+          <Stack.Screen 
+            name="UsersList" 
+            component={require('./src/screens/UsersListScreen').default}
+            options={{ 
+              title: 'Lista de Usuários',
+              headerBackTitle: 'Voltar'
+            }}
+          />
+          <Stack.Screen 
+            name="UserDetails" 
+            component={require('./src/screens/UserDetailsScreen').default}
+            options={{ 
+              title: 'Detalhes do Usuário',
               headerBackTitle: 'Voltar'
             }}
           />

@@ -21,14 +21,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useVehicle } from '../contexts/VehicleContext';
 import { Payment, PaymentMethod } from '../types';
 import { formatCurrency, formatDateTime, getPaymentStatus } from '../utils/dateUtils';
+import { paymentService } from '../services/paymentService';
+import PixPayment from '../components/PixPayment';
+import PaymentReceipt from '../components/PaymentReceipt';
 
 interface PaymentHistoryScreenProps {
   navigation: any;
 }
 
 export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScreenProps) {
-  const { paymentHistory, loading, refreshData, processPayment } = useVehicle();
+  const { paymentHistory, loading, refreshData, processPayment, vehicles } = useVehicle();
   const [processingPayment, setProcessingPayment] = useState<string | null>(null);
+  const [showPixPayment, setShowPixPayment] = useState<number | null>(null);
+  const [showReceipt, setShowReceipt] = useState<number | null>(null);
   const theme = useTheme();
 
   useEffect(() => {
@@ -37,14 +42,23 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
 
   const handlePayment = (payment: Payment) => {
     Alert.alert(
-      'Processar Pagamento',
-      `Deseja pagar ${formatCurrency(payment.amount)} para ${payment.vehicleName}?`,
+      'Pagamento via PIX',
+      `Deseja gerar PIX de ${formatCurrency(payment.amount)} para ${payment.vehicleName}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'PIX', onPress: () => processPaymentWithMethod(payment.id, 'PIX') },
-        { text: 'Cartão', onPress: () => processPaymentWithMethod(payment.id, 'Cartão de Crédito') },
-        { text: 'Boleto', onPress: () => processPaymentWithMethod(payment.id, 'Boleto') }
+        { text: 'Gerar PIX', onPress: () => setShowPixPayment(parseInt(payment.id.toString())) }
       ]
+    );
+  };
+
+  const handlePixPaymentComplete = (paymentData: any) => {
+    Alert.alert(
+      'Pagamento Concluído!',
+      'Seu pagamento PIX foi processado com sucesso.',
+      [{ text: 'OK', onPress: () => {
+        setShowPixPayment(null);
+        refreshData();
+      }}]
     );
   };
 
@@ -52,7 +66,7 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
     setProcessingPayment(paymentId);
     
     try {
-      const result = await processPayment(paymentId, method);
+      const result = await processPayment(parseInt(paymentId), method);
       
       if (result.success) {
         Alert.alert(
@@ -74,8 +88,8 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
   };
 
   const renderPaymentCard = ({ item }: { item: Payment }) => {
-    const status = getPaymentStatus(item);
-    const isProcessing = processingPayment === item.id;
+    const status = getPaymentStatus({ ...item, dueDate: item.dueDate || item.due_date || new Date().toISOString() });
+    const isProcessing = processingPayment === item.id.toString();
 
     return (
       <Card style={styles.card}>
@@ -106,7 +120,7 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
               <Ionicons name="calendar-outline" size={16} color="#666" />
               <Text style={styles.detailLabel}>Vencimento:</Text>
               <Text style={styles.detailValue}>
-                {formatDateTime(item.dueDate).split(' ')[0]}
+                {item.dueDate ? formatDateTime(item.dueDate).split(' ')[0] : 'Não informado'}
               </Text>
             </View>
 
@@ -149,29 +163,69 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
             </Surface>
           </View>
 
-          {/* Payment Button */}
-          {(item.status === 'pendente' || item.status === 'vencido') && (
-            <Button
-              mode="contained"
-              onPress={() => handlePayment(item)}
-              style={[
-                styles.payButton,
-                { backgroundColor: item.status === 'vencido' ? '#f44336' : theme.colors.primary }
-              ]}
-              disabled={isProcessing}
-              contentStyle={styles.payButtonContent}
-            >
-              {isProcessing ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                `Pagar ${formatCurrency(item.amount)}`
+          {/* Action Buttons */}
+          <View style={styles.actionButtonsContainer}>
+            {/* Receipt Button - Only for completed/paid payments */}
+            {(item.status === 'completed' || item.status === 'pago') && (
+              <Button
+                mode="outlined"
+                onPress={() => setShowReceipt(parseInt(item.id.toString()))}
+                style={styles.receiptButton}
+                icon="receipt"
+              >
+                Comprovante
+              </Button>
+            )}
+
+            {/* Payment Button - Only for pending/overdue */}
+            {(item.status === 'pending' || item.status === 'overdue' || item.status === 'pendente' || item.status === 'vencido') && (
+              <Button
+                mode="contained"
+                onPress={() => handlePayment(item)}
+                style={[
+                  styles.payButton,
+                  { backgroundColor: (item.status === 'overdue' || item.status === 'vencido') ? '#f44336' : theme.colors.primary }
+                ]}
+                disabled={isProcessing}
+                contentStyle={styles.payButtonContent}
+              >
+                {isProcessing ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  `Pagar ${formatCurrency(item.amount)}`
+                )}
+              </Button>
+            )}
+          </View>
+
+          {/* PIX Payment Component */}
+          {(item.status === 'pending' || item.status === 'overdue' || item.status === 'pendente' || item.status === 'vencido') && (
+            <View>
+              {showPixPayment === parseInt(item.id.toString()) && (
+                <View style={styles.pixPaymentContainer}>
+                  <PixPayment 
+                    paymentId={parseInt(item.id.toString())}
+                    amount={item.amount}
+                    description={`Pagamento - ${item.vehicleName || 'Veículo'}`}
+                    onPaymentComplete={handlePixPaymentComplete}
+                  />
+                  <Button
+                    mode="text"
+                    onPress={() => setShowPixPayment(null)}
+                    style={styles.cancelPixButton}
+                  >
+                    Cancelar PIX
+                  </Button>
+                </View>
               )}
-            </Button>
+            </View>
           )}
         </Card.Content>
       </Card>
     );
   };
+
+  // Add PaymentReceipt modal to the main render
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
@@ -191,8 +245,8 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
   );
 
   // Calculate summary
-  const paidPayments = paymentHistory.filter(p => p.status === 'pago');
-  const pendingPayments = paymentHistory.filter(p => p.status === 'pendente' || p.status === 'vencido');
+  const paidPayments = paymentHistory.filter(p => p.status === 'completed' || p.status === 'pago');
+  const pendingPayments = paymentHistory.filter(p => p.status === 'pending' || p.status === 'overdue' || p.status === 'pendente' || p.status === 'vencido');
   const totalPaid = paidPayments.reduce((sum, p) => sum + p.amount, 0);
   const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -233,10 +287,10 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
       {/* Payment List */}
       <FlatList
         data={paymentHistory.sort((a, b) => 
-          new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
+          new Date(b.dueDate || b.due_date || '').getTime() - new Date(a.dueDate || a.due_date || '').getTime()
         )}
         renderItem={renderPaymentCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={[
           styles.listContainer,
           paymentHistory.length === 0 && styles.emptyListContainer
@@ -251,6 +305,15 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
+      
+      {/* Payment Receipt Modal */}
+      {showReceipt && (
+        <PaymentReceipt
+          visible={!!showReceipt}
+          onDismiss={() => setShowReceipt(null)}
+          paymentId={showReceipt}
+        />
+      )}
     </View>
   );
 }
@@ -409,5 +472,24 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     paddingHorizontal: 24,
+  },
+  pixPaymentContainer: {
+    marginTop: 12,
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  cancelPixButton: {
+    marginTop: 8,
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 12,
+  },
+  receiptButton: {
+    flex: 1,
   },
 });

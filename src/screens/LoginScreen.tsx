@@ -6,7 +6,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  TouchableOpacity
 } from 'react-native';
 import {
   TextInput,
@@ -35,7 +34,7 @@ export default function LoginScreen() {
     }
 
     setLoading(true);
-    const result = await login(email.trim(), password);
+    const result = await login(email.trim(), password.trim());
     setLoading(false);
 
     if (!result.success) {
@@ -43,10 +42,6 @@ export default function LoginScreen() {
     }
   };
 
-  const fillDemoCredentials = () => {
-    setEmail('demo@vehiclerental.com');
-    setPassword('123456');
-  };
 
   return (
     <KeyboardAvoidingView
@@ -59,7 +54,7 @@ export default function LoginScreen() {
             <Ionicons name="car" size={60} color="white" />
           </View>
           <Title style={[styles.title, { color: theme.colors.primary }]}>
-            Vehicle Rental
+            Nanquim Locações
           </Title>
           <Text style={styles.subtitle}>
             Faça login para acessar seus veículos
@@ -79,6 +74,8 @@ export default function LoginScreen() {
               style={styles.input}
               left={<TextInput.Icon icon="email" />}
               disabled={loading}
+              selectTextOnFocus={true}
+              contextMenuHidden={false}
             />
 
             <TextInput
@@ -109,24 +106,7 @@ export default function LoginScreen() {
               {loading ? <ActivityIndicator color="white" /> : 'Entrar'}
             </Button>
 
-            <TouchableOpacity
-              style={styles.demoButton}
-              onPress={fillDemoCredentials}
-              disabled={loading}
-            >
-              <Text style={[styles.demoText, { color: theme.colors.primary }]}>
-                Preencher dados de demonstração
-              </Text>
-            </TouchableOpacity>
 
-            <View style={styles.helpContainer}>
-              <Text style={styles.helpText}>
-                Use qualquer email válido e senha para testar
-              </Text>
-              <Text style={styles.helpSubText}>
-                Exemplo: demo@vehiclerental.com
-              </Text>
-            </View>
           </Card.Content>
         </Card>
       </ScrollView>
@@ -137,7 +117,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
   },
   scrollContainer: {
     flexGrow: 1,
@@ -184,29 +164,5 @@ const styles = StyleSheet.create({
   },
   buttonContent: {
     paddingVertical: 8,
-  },
-  demoButton: {
-    alignItems: 'center',
-    paddingVertical: 8,
-    marginBottom: 16,
-  },
-  demoText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  helpContainer: {
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  helpText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  helpSubText: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
   },
 });

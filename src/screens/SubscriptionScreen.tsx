@@ -1,142 +1,54 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
   View,
   StyleSheet,
-  ScrollView,
-  Alert
+  ScrollView
 } from 'react-native';
 import {
   Card,
   Title,
   Text,
-  Button,
   Surface,
-  ActivityIndicator,
   useTheme,
   Divider,
-  Switch,
-  List
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useVehicle } from '../contexts/VehicleContext';
-import { formatCurrency } from '../utils/dateUtils';
+import { formatCurrency, formatDate } from '../utils/dateUtils';
 
 interface SubscriptionScreenProps {
   navigation: any;
 }
 
 export default function SubscriptionScreen({ navigation }: SubscriptionScreenProps) {
-  const { vehicles, getPendingPayments, processPayment } = useVehicle();
-  const [loading, setLoading] = useState(false);
-  const [autoRenewal, setAutoRenewal] = useState(true);
-  const [paymentMethod, setPaymentMethod] = useState('Cartão de Crédito');
+  const { vehicles, getPendingPayments } = useVehicle();
   const theme = useTheme();
 
   const pendingPayments = getPendingPayments();
   const totalPendingAmount = pendingPayments.reduce((sum, payment) => sum + payment.amount, 0);
-  const totalMonthlyAmount = vehicles.reduce((sum, vehicle) => sum + vehicle.monthlyPrice, 0);
+  const totalMonthlyAmount = vehicles.reduce((sum, vehicle) => sum + (vehicle.price || vehicle.monthlyPrice || 0), 0);
 
-  const handlePayAllPending = () => {
-    if (pendingPayments.length === 0) {
-      Alert.alert('Aviso', 'Não há pagamentos pendentes.');
-      return;
-    }
 
-    Alert.alert(
-      'Pagar Todas as Pendências',
-      `Deseja pagar ${formatCurrency(totalPendingAmount)} referente a ${pendingPayments.length} mensalidade${pendingPayments.length > 1 ? 's' : ''} pendente${pendingPayments.length > 1 ? 's' : ''}?\n\nMétodo de pagamento: ${paymentMethod}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Confirmar', onPress: processAllPayments }
-      ]
-    );
-  };
 
-  const processAllPayments = async () => {
-    setLoading(true);
-    let successCount = 0;
-    let failureCount = 0;
 
-    try {
-      for (const payment of pendingPayments) {
-        try {
-          const result = await processPayment(payment.id, paymentMethod as any);
-          if (result.success) {
-            successCount++;
-          } else {
-            failureCount++;
-          }
-        } catch (error) {
-          failureCount++;
-        }
-      }
 
-      if (successCount > 0 && failureCount === 0) {
-        Alert.alert(
-          'Sucesso!',
-          `Todos os ${successCount} pagamento${successCount > 1 ? 's foram processados' : ' foi processado'} com sucesso!`
-        );
-      } else if (successCount > 0 && failureCount > 0) {
-        Alert.alert(
-          'Parcialmente Processado',
-          `${successCount} pagamento${successCount > 1 ? 's foram processados' : ' foi processado'} com sucesso.\n${failureCount} falharam. Tente novamente para os restantes.`
-        );
-      } else {
-        Alert.alert(
-          'Erro',
-          'Falha ao processar os pagamentos. Tente novamente.'
-        );
-      }
-    } catch (error) {
-      Alert.alert('Erro', 'Erro interno. Tente novamente.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRenewSubscription = () => {
-    Alert.alert(
-      'Renovar Assinatura',
-      'Deseja renovar sua assinatura por mais um período?\n\nIsso estenderá o prazo de todos os seus veículos alugados.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Renovar', onPress: processRenewal }
-      ]
-    );
-  };
-
-  const processRenewal = async () => {
-    setLoading(true);
+  // Get next due date from pending payments
+  const getNextDueDate = () => {
+    const pendingPayments = getPendingPayments();
     
-    // Simulate renewal process
-    setTimeout(() => {
-      setLoading(false);
-      Alert.alert(
-        'Sucesso!',
-        'Sua assinatura foi renovada com sucesso! Os prazos de todos os veículos foram estendidos por mais um mês.',
-        [{ text: 'OK' }]
-      );
-    }, 2000);
+    if (pendingPayments.length === 0) {
+      return 'em breve';
+    }
+    
+    // Find the earliest due date among pending payments
+    const earliestDueDate = pendingPayments
+      .map(payment => new Date(payment.due_date || payment.dueDate || new Date()))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+    
+    return formatDate(earliestDueDate.toISOString());
   };
 
-  const handleCancelSubscription = () => {
-    Alert.alert(
-      'Cancelar Assinatura',
-      'Tem certeza que deseja cancelar sua assinatura?\n\nEsta ação não pode ser desfeita e você perderá acesso aos veículos no final do período atual.',
-      [
-        { text: 'Manter Ativa', style: 'cancel' },
-        { text: 'Cancelar Assinatura', style: 'destructive', onPress: processCancellation }
-      ]
-    );
-  };
 
-  const processCancellation = () => {
-    Alert.alert(
-      'Assinatura Cancelada',
-      'Sua assinatura foi cancelada. Você continuará tendo acesso aos veículos até o final do período já pago.',
-      [{ text: 'OK' }]
-    );
-  };
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -182,10 +94,7 @@ export default function SubscriptionScreen({ navigation }: SubscriptionScreenPro
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Próximo Vencimento:</Text>
               <Text style={styles.detailValue}>
-                {vehicles.length > 0 
-                  ? new Date(Math.min(...vehicles.map(v => new Date(v.rentalExpiration).getTime()))).toLocaleDateString('pt-BR')
-                  : '-'
-                }
+                {getNextDueDate()}
               </Text>
             </View>
           </View>
@@ -210,16 +119,6 @@ export default function SubscriptionScreen({ navigation }: SubscriptionScreenPro
               </Text>
             </View>
 
-            <Button
-              mode="contained"
-              onPress={handlePayAllPending}
-              style={[styles.payAllButton, { backgroundColor: '#f44336' }]}
-              disabled={loading}
-              contentStyle={styles.buttonContent}
-              icon="credit-card"
-            >
-              {loading ? <ActivityIndicator color="white" /> : 'Pagar Todas as Pendências'}
-            </Button>
           </Card.Content>
         </Card>
       )}
@@ -229,70 +128,20 @@ export default function SubscriptionScreen({ navigation }: SubscriptionScreenPro
         <Card.Content>
           <Title style={styles.sectionTitle}>Configurações de Pagamento</Title>
 
-          <List.Section>
-            <List.Item
-              title="Renovação Automática"
-              description="Renovar automaticamente quando próximo ao vencimento"
-              left={(props) => <List.Icon {...props} icon="autorenew" />}
-              right={() => (
-                <Switch
-                  value={autoRenewal}
-                  onValueChange={setAutoRenewal}
-                  color={theme.colors.primary}
-                />
-              )}
-            />
+          <View style={styles.paymentMethodInfo}>
+            <View style={styles.paymentMethodRow}>
+              <Ionicons name="logo-bitcoin" size={24} color={theme.colors.primary} />
+              <View style={styles.paymentMethodText}>
+                <Text style={styles.paymentMethodTitle}>Método de Pagamento</Text>
+                <Text style={styles.paymentMethodDescription}>PIX - Pagamento instantâneo</Text>
+              </View>
+            </View>
+          </View>
 
-            <List.Item
-              title="Método de Pagamento Padrão"
-              description={paymentMethod}
-              left={(props) => <List.Icon {...props} icon="credit-card" />}
-              right={(props) => <List.Icon {...props} icon="chevron-right" />}
-              onPress={() => {
-                Alert.alert(
-                  'Método de Pagamento',
-                  'Escolha seu método de pagamento padrão:',
-                  [
-                    { text: 'PIX', onPress: () => setPaymentMethod('PIX') },
-                    { text: 'Cartão de Crédito', onPress: () => setPaymentMethod('Cartão de Crédito') },
-                    { text: 'Boleto', onPress: () => setPaymentMethod('Boleto') },
-                    { text: 'Cancelar', style: 'cancel' }
-                  ]
-                );
-              }}
-            />
-          </List.Section>
         </Card.Content>
       </Card>
 
-      {/* Subscription Actions */}
-      <Card style={styles.actionsCard}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>Ações da Assinatura</Title>
 
-          <Button
-            mode="contained"
-            onPress={handleRenewSubscription}
-            style={styles.renewButton}
-            disabled={loading}
-            contentStyle={styles.buttonContent}
-            icon="refresh"
-          >
-            {loading ? <ActivityIndicator color="white" /> : 'Renovar Assinatura'}
-          </Button>
-
-          <Button
-            mode="outlined"
-            onPress={handleCancelSubscription}
-            style={styles.cancelButton}
-            contentStyle={styles.buttonContent}
-            textColor="#f44336"
-            icon="cancel"
-          >
-            Cancelar Assinatura
-          </Button>
-        </Card.Content>
-      </Card>
 
       <View style={styles.bottomSpacing} />
     </ScrollView>
@@ -302,7 +151,7 @@ export default function SubscriptionScreen({ navigation }: SubscriptionScreenPro
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     padding: 20,
@@ -316,7 +165,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#000000',
   },
   statusCard: {
     margin: 16,
@@ -422,11 +271,32 @@ const styles = StyleSheet.create({
   renewButton: {
     marginBottom: 12,
   },
-  cancelButton: {
-    borderColor: '#f44336',
+  paymentMethodInfo: {
+    paddingVertical: 16,
+  },
+  paymentMethodRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  paymentMethodText: {
+    marginLeft: 16,
+    flex: 1,
+  },
+  paymentMethodTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  paymentMethodDescription: {
+    fontSize: 14,
+    color: '#666',
   },
   buttonContent: {
     paddingVertical: 8,
+  },
+  paySubscriptionButton: {
+    marginTop: 16,
   },
   bottomSpacing: {
     height: 32,

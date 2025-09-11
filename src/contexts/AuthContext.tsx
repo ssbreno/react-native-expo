@@ -2,24 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { User, AuthContextType, AuthResponse } from '../types';
-import { mockAuthService } from '../services/mockApi';
-
-// Platform-aware storage functions
-const setStorageItem = async (key: string, value: string): Promise<void> => {
-  if (Platform.OS === 'web') {
-    localStorage.setItem(key, value);
-  } else {
-    await SecureStore.setItemAsync(key, value);
-  }
-};
-
-const getStorageItem = async (key: string): Promise<string | null> => {
-  if (Platform.OS === 'web') {
-    return localStorage.getItem(key);
-  } else {
-    return await SecureStore.getItemAsync(key);
-  }
-};
+import { authService } from '../services/authService';
 
 const deleteStorageItem = async (key: string): Promise<void> => {
   if (Platform.OS === 'web') {
@@ -54,13 +37,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const checkAuthState = async (): Promise<void> => {
     try {
-      const token = await getStorageItem('authToken');
-      const userData = await getStorageItem('userData');
+      const token = await authService.getStoredToken();
+      const userData = await authService.getStoredUser();
       
       if (token && userData) {
-        const parsedUser = JSON.parse(userData) as User;
-        setUser(parsedUser);
+        setUser(userData);
         setIsAuthenticated(true);
+        
+        // Validate token with server
+        const profileResult = await authService.getCurrentUser();
+        if (profileResult.success && profileResult.data) {
+          setUser(profileResult.data);
+        }
       }
     } catch (error) {
       console.error('Erro ao verificar estado de autenticação:', error);
@@ -73,23 +61,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (email: string, password: string): Promise<AuthResponse> => {
     try {
-      console.log('🔐 Iniciando login...', { email });
       setLoading(true);
-      const result = await mockAuthService.login(email, password);
-      console.log('🔐 Resultado do login:', result);
+      const result = await authService.login(email, password);
       
       if (result.success && result.user && result.token) {
-        console.log('🔐 Login bem-sucedido, armazenando dados...');
-        // Store auth data securely
-        await setStorageItem('authToken', result.token);
-        await setStorageItem('userData', JSON.stringify(result.user));
-        
-        console.log('🔐 Dados armazenados, atualizando estado...');
-        setUser(result.user);
+        // Auth data is already stored by authService
+        const userWithAdminCheck = {
+          ...result.user,
+          is_admin: result.user.is_admin || result.user.email === 'admin@vehicles.com' || result.user.email.toLowerCase().includes('admin')
+        };
+        setUser(userWithAdminCheck);
         setIsAuthenticated(true);
-        console.log('🔐 Estado atualizado - usuário autenticado!');
-      } else {
-        console.log('🔐 Login falhou:', result.error);
       }
       
       return result;
@@ -109,7 +91,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(true);
       
       // Call logout service
-      await mockAuthService.logout();
+      await authService.logout();
       
       // Clear stored data
       await clearAuthData();
@@ -131,10 +113,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await deleteStorageItem('authToken');
       await deleteStorageItem('userData');
+      await deleteStorageItem('refresh_token');
     } catch (error) {
       console.error('Erro ao limpar dados de autenticação:', error);
     }
   };
+
+  // Monitor token changes and automatically logout if tokens are cleared by API interceptor
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (isAuthenticated) {
+      interval = setInterval(async () => {
+        const token = await authService.getStoredToken();
+        if (!token && isAuthenticated) {
+          // Token was cleared (likely by API interceptor after failed refresh)
+          console.log('Token cleared, forcing logout');
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      }, 2000); // Check every 2 seconds
+    }
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isAuthenticated]);
 
   const value: AuthContextType = {
     user,

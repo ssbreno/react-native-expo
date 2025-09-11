@@ -21,8 +21,8 @@ import {
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useVehicle } from '../contexts/VehicleContext';
-import { Vehicle } from '../types';
-import { formatCurrency, getExpirationStatus } from '../utils/dateUtils';
+import { Vehicle, Payment } from '../types';
+import { formatCurrency, formatDate } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -31,7 +31,7 @@ interface VehicleListScreenProps {
 }
 
 export default function VehicleListScreen({ navigation }: VehicleListScreenProps) {
-  const { vehicles, loading, refreshData } = useVehicle();
+  const { vehicles, loading, refreshData, getPendingPayments } = useVehicle();
   const theme = useTheme();
 
   useEffect(() => {
@@ -42,29 +42,105 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
     navigation.navigate('VehicleDetail', { vehicleId });
   };
 
+  // Get payment status for a vehicle
+  const getVehiclePaymentStatus = (vehicleId: number) => {
+    const pendingPayments = getPendingPayments();
+    const vehiclePayments = pendingPayments.filter(payment => 
+      payment.vehicle_id === vehicleId || parseInt(payment.vehicleId || '0') === vehicleId
+    );
+    
+    if (vehiclePayments.length === 0) {
+      // Create a default next payment date (30 days from now)
+      const nextMonth = new Date();
+      nextMonth.setDate(nextMonth.getDate() + 30);
+      return { 
+        status: 'upcoming', 
+        text: formatDate(nextMonth.toISOString()).split('/').slice(0, 2).join('/'), 
+        color: '#4caf50', 
+        days: 30,
+        dueDate: formatDate(nextMonth.toISOString())
+      };
+    }
+    
+    // Find the next due payment
+    const nextPayment = vehiclePayments
+      .sort((a, b) => new Date(a.due_date || a.dueDate || '').getTime() - new Date(b.due_date || b.dueDate || '').getTime())[0];
+    
+    const dueDate = new Date(nextPayment.due_date || nextPayment.dueDate || '');
+    const today = new Date();
+    const diffTime = dueDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      // Overdue
+      return {
+        status: 'overdue',
+        text: `${Math.abs(diffDays)} dias atrasado`,
+        color: '#f44336',
+        days: Math.abs(diffDays),
+        dueDate: formatDate(dueDate.toISOString())
+      };
+    } else if (diffDays === 0) {
+      // Due today
+      return {
+        status: 'due_today',
+        text: 'Vence hoje',
+        color: '#ff9800',
+        days: 0,
+        dueDate: formatDate(dueDate.toISOString())
+      };
+    } else {
+      // Future due date
+      return {
+        status: 'upcoming',
+        text: `${diffDays} dias`,
+        color: '#4caf50',
+        days: diffDays,
+        dueDate: formatDate(dueDate.toISOString())
+      };
+    }
+  };
+
   const renderVehicleCard = ({ item }: { item: Vehicle }) => {
-    const expirationStatus = getExpirationStatus(item.rentalExpiration);
+    // Get vehicle name from API fields
+    const vehicleName = `${item.brand} ${item.model}`;
+    const displayYear = item.manufacture_year || item.model_year || 'N/A';
+    
+    // Status mapping from API to display
+    const getStatusDisplay = (status: string) => {
+      switch (status) {
+        case 'available': return { text: 'DISPONÍVEL', color: '#4caf50' };
+        case 'rented': return { text: 'ALUGADO', color: '#ff9800' };
+        case 'maintenance': return { text: 'MANUTENÇÃO', color: '#f44336' };
+        default: return { text: status.toUpperCase(), color: '#666' };
+      }
+    };
+
+    const statusDisplay = getStatusDisplay(item.status);
+    const paymentStatus = getVehiclePaymentStatus(item.id);
 
     return (
       <TouchableOpacity
-        onPress={() => handleVehiclePress(item.id)}
+        onPress={() => handleVehiclePress(item.id.toString())}
         style={styles.cardContainer}
       >
         <Card style={styles.card}>
           <View style={styles.cardContent}>
-            {/* Vehicle Image */}
-            <Image source={{ uri: item.imageUrl }} style={styles.vehicleImage} />
+            {/* Vehicle Icon (since no image in API) */}
+            <View style={styles.vehicleImagePlaceholder}>
+              <Ionicons name="car" size={40} color="#666" />
+            </View>
             
             {/* Vehicle Info */}
             <View style={styles.vehicleInfo}>
-              <Title style={styles.vehicleName} numberOfLines={1}>
-                {item.name}
+              <Title style={styles.vehicleName} numberOfLines={2}>
+                {vehicleName}
               </Title>
               
               <View style={styles.detailsContainer}>
                 <View style={styles.detailRow}>
-                  <Ionicons name="car" size={16} color="#666" />
-                  <Text style={styles.detailText}>{item.plate}</Text>
+                  <Ionicons name="card" size={16} color="#666" />
+                  <Text style={styles.detailText}>{item.license_plate}</Text>
                 </View>
                 
                 <View style={styles.detailRow}>
@@ -74,7 +150,7 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
                 
                 <View style={styles.detailRow}>
                   <Ionicons name="calendar" size={16} color="#666" />
-                  <Text style={styles.detailText}>{item.year}</Text>
+                  <Text style={styles.detailText}>{displayYear}</Text>
                 </View>
               </View>
 
@@ -82,21 +158,19 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
               <View style={styles.priceContainer}>
                 <Text style={styles.priceLabel}>Mensalidade:</Text>
                 <Text style={[styles.price, { color: theme.colors.primary }]}>
-                  {formatCurrency(item.monthlyPrice)}
+                  {formatCurrency(item.price)}
                 </Text>
               </View>
 
-              {/* Expiration Status */}
+              {/* Vencimento Status */}
               <View style={styles.statusContainer}>
                 <Text style={styles.expirationLabel}>Vencimento:</Text>
-                <Surface
-                  style={[
-                    styles.expirationChip,
-                    { backgroundColor: expirationStatus.backgroundColor }
-                  ]}
-                >
-                  <Text style={[styles.expirationText, { color: expirationStatus.color }]}>
-                    {expirationStatus.text}
+                <Surface style={[
+                  styles.expirationChip, 
+                  { backgroundColor: paymentStatus.status === 'overdue' ? '#ffebee' : paymentStatus.status === 'due_today' ? '#fff3e0' : '#e8f5e8' }
+                ]}>
+                  <Text style={[styles.expirationText, { color: paymentStatus.color }]}>
+                    {paymentStatus.text}
                   </Text>
                 </Surface>
               </View>
@@ -106,15 +180,11 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
                 mode="outlined"
                 style={[
                   styles.statusChip,
-                  {
-                    borderColor: item.status === 'ativo' ? '#4caf50' : '#ff9800'
-                  }
+                  { borderColor: statusDisplay.color }
                 ]}
-                textStyle={{
-                  color: item.status === 'ativo' ? '#4caf50' : '#ff9800'
-                }}
+                textStyle={{ color: statusDisplay.color }}
               >
-                {item.status.toUpperCase()}
+                {statusDisplay.text}
               </Chip>
             </View>
           </View>
@@ -123,7 +193,7 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
           <Card.Actions style={styles.cardActions}>
             <Button
               mode="outlined"
-              onPress={() => handleVehiclePress(item.id)}
+              onPress={() => handleVehiclePress(item.id.toString())}
               icon="arrow-right"
               contentStyle={styles.buttonContent}
             >
@@ -175,7 +245,7 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
       <FlatList
         data={vehicles}
         renderItem={renderVehicleCard}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.id.toString()}
         contentContainerStyle={[
           styles.listContainer,
           vehicles.length === 0 && styles.emptyListContainer
@@ -235,6 +305,15 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 8,
     marginRight: 16,
+  },
+  vehicleImagePlaceholder: {
+    width: 120,
+    height: 90,
+    borderRadius: 8,
+    marginRight: 16,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   vehicleInfo: {
     flex: 1,

@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Vehicle, Payment, VehicleContextType, PaymentMethod, ApiResponse } from '../types';
-import { mockVehicleService, mockPaymentService } from '../services/mockApi';
+import { vehicleService } from '../services/vehicleService';
+import { paymentService } from '../services/paymentService';
+import { useAuth } from './AuthContext';
 
 const VehicleContext = createContext<VehicleContextType | undefined>(undefined);
 
@@ -17,13 +19,16 @@ interface VehicleProviderProps {
 }
 
 export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) => {
+  const { user } = useAuth();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    if (user) {
+      loadInitialData();
+    }
+  }, [user]);
 
   const loadInitialData = async (): Promise<void> => {
     setLoading(true);
@@ -41,7 +46,13 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
 
   const loadVehicles = async (): Promise<void> => {
     try {
-      const response = await mockVehicleService.getVehicles();
+      // Skip loading user vehicles for admin users
+      if (user?.is_admin === true) {
+        setVehicles([]);
+        return;
+      }
+
+      const response = await vehicleService.getUserVehicles();
       if (response.success && response.data) {
         setVehicles(response.data);
       } else {
@@ -54,7 +65,13 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
 
   const loadPaymentHistory = async (): Promise<void> => {
     try {
-      const response = await mockPaymentService.getPaymentHistory();
+      // Skip loading personal payment history for admin users
+      if (user?.is_admin === true) {
+        setPaymentHistory([]);
+        return;
+      }
+
+      const response = await paymentService.getMyPayments();
       if (response.success && response.data) {
         setPaymentHistory(response.data);
       } else {
@@ -69,36 +86,31 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
     await loadInitialData();
   };
 
-  const getVehicleById = (id: string): Vehicle | undefined => {
+  const getVehicleById = (id: number): Vehicle | undefined => {
     return vehicles.find(vehicle => vehicle.id === id);
   };
 
-  const getPaymentsByVehicle = (vehicleId: string): Payment[] => {
-    return paymentHistory.filter(payment => payment.vehicleId === vehicleId);
+  const getPaymentsByVehicle = (vehicleId: number): Payment[] => {
+    return paymentHistory.filter(payment => 
+      payment.vehicle_id === vehicleId || 
+      parseInt(payment.vehicleId || '0') === vehicleId
+    );
   };
 
   const getPendingPayments = (): Payment[] => {
     return paymentHistory.filter(payment => 
-      payment.status === 'pendente' || payment.status === 'vencido'
+      payment.status === 'pending' || payment.status === 'overdue'
     );
   };
 
   const processPayment = async (
-    paymentId: string, 
+    paymentId: number, 
     paymentMethod: PaymentMethod
   ): Promise<ApiResponse> => {
     try {
-      const response = await mockPaymentService.processPayment(paymentId, paymentMethod);
-      
-      if (response.success && response.data) {
-        // Update local payment history
-        setPaymentHistory(prevPayments => 
-          prevPayments.map(payment => 
-            payment.id === paymentId ? response.data! : payment
-          )
-        );
-      }
-      
+      // For now, keep the existing mock logic for non-PIX payments
+      // PIX payments are handled by the PixPayment component
+      const response = { success: false, error: 'Use PIX payment component for new payments' };
       return response;
     } catch (error) {
       console.error('Erro ao processar pagamento:', error);
@@ -106,6 +118,17 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
         success: false,
         error: 'Erro interno do servidor'
       };
+    }
+  };
+
+  const updatePaymentStatus = async (paymentId: number): Promise<boolean> => {
+    try {
+      // Refresh payment history to get updated status
+      await loadPaymentHistory();
+      return true;
+    } catch (error) {
+      console.error('Erro ao atualizar status do pagamento:', error);
+      return false;
     }
   };
 
@@ -117,6 +140,7 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
     getPaymentsByVehicle,
     getPendingPayments,
     processPayment,
+    updatePaymentStatus,
     loadVehicles,
     refreshData
   };

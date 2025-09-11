@@ -3,7 +3,6 @@ import {
   View,
   StyleSheet,
   ScrollView,
-  Image,
   Alert,
   Dimensions
 } from 'react-native';
@@ -21,7 +20,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useVehicle } from '../contexts/VehicleContext';
 import { Vehicle, Payment } from '../types';
-import { formatCurrency, getExpirationStatus, getPaymentStatus } from '../utils/dateUtils';
+import { formatCurrency, getPaymentStatus } from '../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 
@@ -40,7 +39,7 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processingPayment, setProcessingPayment] = useState<string | null>(null);
+  const [processingPayment, setProcessingPayment] = useState<number | null>(null);
   const theme = useTheme();
 
   useEffect(() => {
@@ -51,8 +50,14 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
     setLoading(true);
     try {
       await refreshData();
-      const vehicleData = getVehicleById(vehicleId);
-      const vehiclePayments = getPaymentsByVehicle(vehicleId);
+      // Convert string ID to number for API compatibility
+      const numericVehicleId = parseInt(vehicleId);
+      console.log(`[VehicleDetail] Loading vehicle ${numericVehicleId}`);
+      const vehicleData = getVehicleById(numericVehicleId);
+      const vehiclePayments = getPaymentsByVehicle(numericVehicleId);
+      
+      console.log(`[VehicleDetail] Vehicle found:`, vehicleData);
+      console.log(`[VehicleDetail] Vehicle payments:`, vehiclePayments);
       
       setVehicle(vehicleData || null);
       setPayments(vehiclePayments);
@@ -70,18 +75,18 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
       `Deseja pagar ${formatCurrency(payment.amount)} para ${payment.vehicleName}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'PIX', onPress: () => processPaymentWithMethod(payment.id, 'PIX') },
-        { text: 'Cartão', onPress: () => processPaymentWithMethod(payment.id, 'Cartão de Crédito') },
-        { text: 'Boleto', onPress: () => processPaymentWithMethod(payment.id, 'Boleto') }
+        { text: 'PIX', onPress: () => processPaymentWithMethod(payment.id.toString(), 'PIX') },
+        { text: 'Cartão', onPress: () => processPaymentWithMethod(payment.id.toString(), 'Cartão de Crédito') },
+        { text: 'Boleto', onPress: () => processPaymentWithMethod(payment.id.toString(), 'Boleto') }
       ]
     );
   };
 
   const processPaymentWithMethod = async (paymentId: string, method: any) => {
-    setProcessingPayment(paymentId);
+    setProcessingPayment(parseInt(paymentId));
     
     try {
-      const result = await processPayment(paymentId, method);
+      const result = await processPayment(parseInt(paymentId), method);
       
       if (result.success) {
         Alert.alert(
@@ -130,24 +135,27 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
     );
   }
 
-  const expirationStatus = getExpirationStatus(vehicle.rentalExpiration);
-  const pendingPayments = payments.filter(p => p.status === 'pendente' || p.status === 'vencido');
+  // Since API doesn't have rental expiration, use a placeholder
+  const expirationStatus = { color: '#4caf50', text: '0 dias', backgroundColor: '#e8f5e8' };
+  const pendingPayments = payments.filter(p => p.status === 'pending' || p.status === 'overdue');
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Vehicle Image */}
-      <Image source={{ uri: vehicle.imageUrl }} style={styles.vehicleImage} />
+      {/* Vehicle Icon Placeholder */}
+      <View style={styles.vehicleImagePlaceholder}>
+        <Ionicons name="car" size={80} color="#666" />
+      </View>
 
       {/* Vehicle Info Card */}
       <Card style={styles.infoCard}>
         <Card.Content>
-          <Title style={styles.vehicleName}>{vehicle.name}</Title>
+          <Title style={styles.vehicleName}>{`${vehicle.brand} ${vehicle.model}`}</Title>
           
           <View style={styles.basicInfo}>
             <View style={styles.infoRow}>
               <Ionicons name="car" size={20} color="#666" />
               <Text style={styles.infoLabel}>Placa:</Text>
-              <Text style={styles.infoValue}>{vehicle.plate}</Text>
+              <Text style={styles.infoValue}>{vehicle.license_plate}</Text>
             </View>
             
             <View style={styles.infoRow}>
@@ -159,13 +167,19 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
             <View style={styles.infoRow}>
               <Ionicons name="calendar" size={20} color="#666" />
               <Text style={styles.infoLabel}>Ano:</Text>
-              <Text style={styles.infoValue}>{vehicle.year}</Text>
+              <Text style={styles.infoValue}>{vehicle.manufacture_year}</Text>
             </View>
             
             <View style={styles.infoRow}>
               <Ionicons name="business" size={20} color="#666" />
               <Text style={styles.infoLabel}>Marca:</Text>
               <Text style={styles.infoValue}>{vehicle.brand}</Text>
+            </View>
+            
+            <View style={styles.infoRow}>
+              <Ionicons name="speedometer" size={20} color="#666" />
+              <Text style={styles.infoLabel}>Combustível:</Text>
+              <Text style={styles.infoValue}>{vehicle.fuel_type}</Text>
             </View>
           </View>
 
@@ -187,7 +201,7 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
             <View style={styles.priceContainer}>
               <Text style={styles.priceLabel}>Valor Mensal:</Text>
               <Text style={[styles.price, { color: theme.colors.primary }]}>
-                {formatCurrency(vehicle.monthlyPrice)}
+                {formatCurrency(vehicle.price)}
               </Text>
             </View>
             
@@ -219,7 +233,7 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
                   color: vehicle.status === 'ativo' ? '#4caf50' : '#ff9800'
                 }}
               >
-                {vehicle.status.toUpperCase()}
+                {vehicle.status === 'ativo' ? 'ATIVO' : vehicle.status.toUpperCase()}
               </Chip>
             </View>
           </View>
@@ -231,16 +245,20 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
         <Card.Content>
           <Title style={styles.sectionTitle}>Características</Title>
           <View style={styles.featuresContainer}>
-            {vehicle.features.map((feature, index) => (
-              <Chip
-                key={index}
-                mode="outlined"
-                style={styles.featureChip}
-                icon="check"
-              >
-                {feature}
-              </Chip>
-            ))}
+            {vehicle.features && vehicle.features.length > 0 ? (
+              vehicle.features.map((feature, index) => (
+                <Chip
+                  key={index}
+                  mode="outlined"
+                  style={styles.featureChip}
+                  icon="check"
+                >
+                  {feature}
+                </Chip>
+              ))
+            ) : (
+              <Text style={styles.noFeaturesText}>Nenhuma característica especial listada</Text>
+            )}
           </View>
         </Card.Content>
       </Card>
@@ -251,8 +269,8 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
           <Card.Content>
             <Title style={styles.sectionTitle}>Pagamentos Pendentes</Title>
             {pendingPayments.map((payment) => {
-              const status = getPaymentStatus(payment);
-              const isProcessing = processingPayment === payment.id;
+              const status = getPaymentStatus({ ...payment, dueDate: payment.dueDate || payment.due_date || new Date().toISOString() });
+              const isProcessing = processingPayment === parseInt(payment.id.toString());
               
               return (
                 <Surface key={payment.id} style={styles.paymentItem}>
@@ -262,7 +280,7 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
                         {payment.description}
                       </Text>
                       <Text style={styles.paymentDueDate}>
-                        Vencimento: {new Date(payment.dueDate).toLocaleDateString('pt-BR')}
+                        Vencimento: {new Date(payment.dueDate || payment.due_date || '').toLocaleDateString('pt-BR')}
                       </Text>
                     </View>
                     
@@ -288,7 +306,7 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
                     onPress={() => handlePayment(payment)}
                     style={[
                       styles.payButton,
-                      { backgroundColor: payment.status === 'vencido' ? '#f44336' : theme.colors.primary }
+                      { backgroundColor: payment.status === 'overdue' ? '#f44336' : theme.colors.primary }
                     ]}
                     disabled={isProcessing}
                     contentStyle={styles.payButtonContent}
@@ -320,6 +338,13 @@ const styles = StyleSheet.create({
     width: width,
     height: 250,
     resizeMode: 'cover',
+  },
+  vehicleImagePlaceholder: {
+    width: width,
+    height: 250,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   infoCard: {
     margin: 16,
@@ -430,6 +455,11 @@ const styles = StyleSheet.create({
   },
   featureChip: {
     marginBottom: 8,
+  },
+  noFeaturesText: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
   },
   paymentsCard: {
     margin: 16,

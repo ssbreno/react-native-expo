@@ -85,6 +85,7 @@ export const getExpirationStatus = (expirationDate: string) => {
 
 export const getPaymentStatus = (payment: { status: string; dueDate: string }) => {
   switch (payment.status) {
+    case 'completed':
     case 'pago':
       return {
         color: '#4caf50',
@@ -92,6 +93,7 @@ export const getPaymentStatus = (payment: { status: string; dueDate: string }) =
         text: 'Pago',
         icon: 'checkmark-circle' as const
       };
+    case 'pending':
     case 'pendente':
       const dateInfo = getDateInfo(payment.dueDate);
       if (dateInfo.isOverdue) {
@@ -108,12 +110,27 @@ export const getPaymentStatus = (payment: { status: string; dueDate: string }) =
         text: 'Pendente',
         icon: 'time' as const
       };
+    case 'overdue':
     case 'vencido':
       return {
         color: '#f44336',
         backgroundColor: '#ffebee',
         text: 'Vencido',
         icon: 'alert-circle' as const
+      };
+    case 'failed':
+      return {
+        color: '#f44336',
+        backgroundColor: '#ffebee',
+        text: 'Falhou',
+        icon: 'close-circle' as const
+      };
+    case 'cancelled':
+      return {
+        color: '#666',
+        backgroundColor: '#f5f5f5',
+        text: 'Cancelado',
+        icon: 'close-circle' as const
       };
     default:
       return {
