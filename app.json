@@ -19,10 +19,28 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.nanquim.locacoes",
       "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
-        "NSCameraUsageDescription": "Este app precisa acessar a câmera para escanear códigos QR de pagamento.",
-        "NSPhotoLibraryUsageDescription": "Este app precisa acessar a galeria para selecionar imagens.",
-        "ITSAppUsesNonExemptEncryption": false
+        "NSCameraUsageDescription": "Este app precisa acessar a câmera para escanear códigos QR de pagamento PIX.",
+        "NSPhotoLibraryUsageDescription": "Este app precisa acessar a galeria para selecionar imagens de perfil.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDisplayName": "Nanquim Locações",
+        "NSAppTransportSecurity": {
+          "NSExceptionDomains": {
+            "vehicles-go-production.up.railway.app": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionMinimumTLSVersion": "1.2"
+            }
+          }
+        }
+      },
+      "associatedDomains": [],
+      "privacyManifests": {
+        "NSPrivacyCollectedDataTypes": [],
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": []
       }
     },
     "android": {
@@ -58,6 +76,9 @@
       "EXPO_PUBLIC_ENABLE_PUSH_NOTIFICATIONS": "false",
       "EXPO_PUBLIC_USE_MOCK_DATA": "false",
       "EXPO_PUBLIC_LOG_LEVEL": "debug"
-    }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

@@ -21,6 +21,7 @@ import {
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { paymentService } from '../services/paymentService';
+import { pdfService } from '../services/pdfService';
 import { formatCurrency, formatDateTime } from '../utils/dateUtils';
 
 interface PaymentReceiptProps {
@@ -60,6 +61,7 @@ export default function PaymentReceipt({
   const [payment, setPayment] = useState<PaymentDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exportingPDF, setExportingPDF] = useState(false);
   const theme = useTheme();
 
   useEffect(() => {
@@ -122,7 +124,7 @@ export default function PaymentReceipt({
 
     const receiptText = [
       'COMPROVANTE DE PAGAMENTO',
-      'Vehicles-Go',
+      'Nanquim Locações',
       '',
       'Informações:',
       `• ID: #${payment.id}`,
@@ -140,7 +142,7 @@ export default function PaymentReceipt({
       `• Criado em: ${formatDateTime(payment.created_at)}`,
       '',
       '---',
-      'Vehicles-Go - Sistema de Gestão de Veículos',
+      'Nanquim Locações - Sistema de Gestão de Veículos',
       `Comprovante gerado em: ${formatDateTime(new Date().toISOString())}`
     ].filter(Boolean).join('\n');
 
@@ -151,6 +153,43 @@ export default function PaymentReceipt({
       });
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível compartilhar o comprovante');
+    }
+  };
+
+  const exportToPDF = async () => {
+    if (!payment) return;
+
+    try {
+      setExportingPDF(true);
+      
+      const result = await pdfService.shareReceiptPDF({
+        id: payment.id,
+        payment_id: payment.payment_id,
+        transaction_id: payment.transaction_id,
+        status: payment.status,
+        description: payment.description,
+        amount: payment.amount,
+        base_amount: payment.base_amount,
+        interest_amount: payment.interest_amount,
+        payment_method: payment.payment_method,
+        due_date: payment.due_date,
+        payment_date: payment.payment_date,
+        created_at: payment.created_at,
+        updated_at: payment.updated_at,
+        vehicle_id: payment.vehicle_id,
+        vehicle_name: payment.vehicle_name,
+        user_id: payment.user_id,
+        user_name: payment.user_name,
+      });
+
+      if (!result.success) {
+        Alert.alert('Erro', result.error || 'Não foi possível gerar o PDF');
+      }
+    } catch (error) {
+      console.error('Erro ao exportar PDF:', error);
+      Alert.alert('Erro', 'Não foi possível gerar o PDF do comprovante');
+    } finally {
+      setExportingPDF(false);
     }
   };
 
@@ -331,6 +370,17 @@ export default function PaymentReceipt({
 
                 {/* Action Buttons */}
                 <View style={styles.actionButtons}>
+                  <Button
+                    mode="contained"
+                    onPress={exportToPDF}
+                    style={[styles.actionButton, { backgroundColor: '#f44336' }]}
+                    icon="file-pdf-box"
+                    loading={exportingPDF}
+                    disabled={exportingPDF}
+                  >
+                    {exportingPDF ? 'Gerando PDF...' : 'Exportar PDF'}
+                  </Button>
+                  
                   <Button
                     mode="contained"
                     onPress={shareReceipt}
