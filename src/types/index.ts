@@ -12,14 +12,14 @@ export interface User {
   phone: string;
   birth_date: string;
   zip_code: string;
-  isAdmin: boolean;
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
   vehicles?: Vehicle[];
   payments?: Payment[];
   // Legacy compatibility
   createdAt?: string;
-  is_admin?: boolean;
+  isAdmin?: boolean;
 }
 
 export interface AuthResponse {
@@ -83,6 +83,20 @@ export interface Vehicle {
   monthlyPrice?: number;
   imageUrl?: string;
   features?: string[];
+}
+
+export interface VehicleUpdateData {
+  brand: string;
+  chassis: string;
+  color: string;
+  description: string;
+  fuel_type: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid';
+  manufacture_year: number;
+  mileage: number;
+  model: string;
+  model_year: number;
+  price: number;
+  status: 'ativo' | 'inativo';
 }
 
 // Payment Types
@@ -185,6 +199,7 @@ export type RootStackParamList = {
   UsersList: undefined;
   UserDetails: { userId: number };
   VehicleDetail: { vehicleId: number };
+  VehicleEdit: { vehicleId: number };
 };
 
 export type MainTabParamList = {

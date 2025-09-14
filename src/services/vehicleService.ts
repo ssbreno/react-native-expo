@@ -1,5 +1,5 @@
 import api from './api';
-import { Vehicle, ApiResponse } from '../types';
+import { Vehicle, ApiResponse, VehicleUpdateData } from '../types';
 import { getUserVehicleIdFromToken } from '../utils/jwtUtils';
 
 export const vehicleService = {
@@ -55,6 +55,21 @@ export const vehicleService = {
       return {
         success: false,
         error: error.response?.data?.error || error.response?.data?.message || 'Erro ao obter veículos do usuário'
+      };
+    }
+  },
+
+  async updateVehicle(id: number, vehicleData: VehicleUpdateData): Promise<ApiResponse<Vehicle>> {
+    try {
+      const response = await api.put(`/vehicles/${id}`, vehicleData);
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Erro ao atualizar veículo'
       };
     }
   },

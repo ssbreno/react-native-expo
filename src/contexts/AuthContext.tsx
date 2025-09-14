@@ -70,6 +70,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           ...result.user,
           is_admin: result.user.is_admin || result.user.email === 'admin@vehicles.com' || result.user.email.toLowerCase().includes('admin')
         };
+        
+        console.log('🔐 AuthContext - Login Success:', {
+          email: userWithAdminCheck.email,
+          is_admin: userWithAdminCheck.is_admin,
+          original_is_admin: result.user.is_admin
+        });
+        
         setUser(userWithAdminCheck);
         setIsAuthenticated(true);
       }

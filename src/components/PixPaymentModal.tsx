@@ -294,10 +294,34 @@ export default function PixPaymentModal({
 
             {/* Payment Info */}
             <Surface style={styles.paymentInfo}>
-              <Text style={styles.amountLabel}>Valor a pagar:</Text>
-              <Text style={[styles.amount, { color: theme.colors.primary }]}>
-                {formatCurrency(paymentData.amount)}
-              </Text>
+              {/* Verificar se há juros aplicados */}
+              {paymentData.amount > paymentData.base_amount ? (
+                <>
+                  <Text style={styles.amountLabel}>Valor Original:</Text>
+                  <Text style={[styles.baseAmount, { color: '#666' }]}>
+                    {formatCurrency(paymentData.base_amount)}
+                  </Text>
+                  
+                  <Text style={styles.interestLabel}>+ Juros de Atraso:</Text>
+                  <Text style={[styles.interestAmount, { color: '#f44336' }]}>
+                    {formatCurrency(paymentData.amount - paymentData.base_amount)}
+                  </Text>
+                  
+                  <View style={styles.totalDivider} />
+                  
+                  <Text style={styles.totalLabel}>Total a Pagar:</Text>
+                  <Text style={[styles.amount, { color: theme.colors.primary }]}>
+                    {formatCurrency(paymentData.amount)}
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.amountLabel}>Valor a pagar:</Text>
+                  <Text style={[styles.amount, { color: theme.colors.primary }]}>
+                    {formatCurrency(paymentData.amount)}
+                  </Text>
+                </>
+              )}
             </Surface>
 
             {/* Payment Status */}
@@ -565,5 +589,31 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 16,
     fontWeight: '500',
+  },
+  baseAmount: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  interestLabel: {
+    fontSize: 14,
+    color: '#f44336',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  interestAmount: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  totalDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 12,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
   },
 });

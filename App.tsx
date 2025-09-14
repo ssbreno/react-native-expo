@@ -16,6 +16,7 @@ import { VehicleProvider } from './src/contexts/VehicleContext';
 import LoginScreen from './src/screens/LoginScreen';
 import VehicleListScreen from './src/screens/VehicleListScreen';
 import VehicleDetailScreen from './src/screens/VehicleDetailScreen';
+import VehicleEditScreen from './src/screens/VehicleEditScreen';
 import PaymentHistoryScreen from './src/screens/PaymentHistoryScreen';
 import SubscriptionScreen from './src/screens/SubscriptionScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
@@ -114,14 +115,27 @@ function MainTabNavigator() {
 function AppNavigator() {
   const { isAuthenticated, loading, user } = useAuth();
 
-  console.log('🚀 AppNavigator - Auth Status:', { isAuthenticated, loading, user: user?.email, isAdmin: user?.is_admin });
+  // Check if user is admin using multiple criteria
+  const isAdmin = user?.is_admin === true || 
+                  user?.isAdmin === true || 
+                  user?.email === 'admin@vehicles.com' || 
+                  user?.email?.toLowerCase().includes('admin');
+
+  console.log('🚀 AppNavigator - Auth Status:', { 
+    isAuthenticated, 
+    loading, 
+    user: user?.email, 
+    is_admin_field: user?.is_admin,
+    isAdmin_field: user?.isAdmin,
+    calculated_isAdmin: isAdmin 
+  });
 
   if (loading) {
     console.log('🚀 AppNavigator - Showing loading state');
     return null; // You could show a loading screen here
   }
 
-  console.log('🚀 AppNavigator - Rendering navigation with auth:', isAuthenticated);
+  console.log('🚀 AppNavigator - Rendering navigation with auth:', isAuthenticated, 'isAdmin:', isAdmin);
 
   return (
     <Stack.Navigator
@@ -141,7 +155,7 @@ function AppNavigator() {
           component={LoginScreen}
           options={{ headerShown: false }}
         />
-      ) : user?.is_admin === true ? (
+      ) : isAdmin ? (
         // Admin Navigation
         <>
           <Stack.Screen 
@@ -182,6 +196,14 @@ function AppNavigator() {
             component={VehicleDetailScreen}
             options={{ 
               title: 'Detalhes do Veículo',
+              headerBackTitle: 'Voltar'
+            }}
+          />
+          <Stack.Screen 
+            name="VehicleEdit" 
+            component={VehicleEditScreen}
+            options={{ 
+              title: 'Editar Veículo',
               headerBackTitle: 'Voltar'
             }}
           />

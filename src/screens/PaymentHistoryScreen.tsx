@@ -40,6 +40,30 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
     refreshData();
   }, []);
 
+  const normalizeStatus = (status: string): string => {
+    const statusMap: Record<string, string> = {
+      'pendente': 'pending',
+      'vencido': 'overdue', 
+      'pago': 'completed',
+      'completed': 'completed',
+      'pending': 'pending',
+      'overdue': 'overdue',
+      'failed': 'failed',
+      'cancelled': 'cancelled'
+    };
+    return statusMap[status] || status;
+  };
+
+  const isPaymentPending = (status: string): boolean => {
+    const normalizedStatus = normalizeStatus(status);
+    return normalizedStatus === 'pending' || normalizedStatus === 'overdue';
+  };
+
+  const isPaymentCompleted = (status: string): boolean => {
+    const normalizedStatus = normalizeStatus(status);
+    return normalizedStatus === 'completed';
+  };
+
   const handlePayment = (payment: Payment) => {
     Alert.alert(
       'Pagamento via PIX',
@@ -106,9 +130,24 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
             </View>
             
             <View style={styles.amountContainer}>
-              <Text style={[styles.amount, { color: theme.colors.primary }]}>
-                {formatCurrency(item.amount)}
-              </Text>
+              {/* Verificar se há juros aplicados */}
+              {item.amount > (item.base_amount || item.amount) ? (
+                <View style={styles.amountBreakdown}>
+                  <Text style={styles.baseAmountSmall}>
+                    Base: {formatCurrency(item.base_amount || item.amount)}
+                  </Text>
+                  <Text style={styles.interestAmountSmall}>
+                    + Juros: {formatCurrency(item.amount - (item.base_amount || item.amount))}
+                  </Text>
+                  <Text style={[styles.amount, { color: theme.colors.primary }]}>
+                    {formatCurrency(item.amount)}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.amount, { color: theme.colors.primary }]}>
+                  {formatCurrency(item.amount)}
+                </Text>
+              )}
             </View>
           </View>
 
@@ -166,7 +205,7 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
           {/* Action Buttons */}
           <View style={styles.actionButtonsContainer}>
             {/* Receipt Button - Only for completed/paid payments */}
-            {(item.status === 'completed' || item.status === 'pago') && (
+            {isPaymentCompleted(item.status) && (
               <Button
                 mode="outlined"
                 onPress={() => setShowReceipt(parseInt(item.id.toString()))}
@@ -178,13 +217,13 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
             )}
 
             {/* Payment Button - Only for pending/overdue */}
-            {(item.status === 'pending' || item.status === 'overdue' || item.status === 'pendente' || item.status === 'vencido') && (
+            {isPaymentPending(item.status) && (
               <Button
                 mode="contained"
                 onPress={() => handlePayment(item)}
                 style={[
                   styles.payButton,
-                  { backgroundColor: (item.status === 'overdue' || item.status === 'vencido') ? '#f44336' : theme.colors.primary }
+                  { backgroundColor: normalizeStatus(item.status) === 'overdue' ? '#f44336' : theme.colors.primary }
                 ]}
                 disabled={isProcessing}
                 contentStyle={styles.payButtonContent}
@@ -199,7 +238,7 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
           </View>
 
           {/* PIX Payment Component */}
-          {(item.status === 'pending' || item.status === 'overdue' || item.status === 'pendente' || item.status === 'vencido') && (
+          {isPaymentPending(item.status) && (
             <View>
               {showPixPayment === parseInt(item.id.toString()) && (
                 <View style={styles.pixPaymentContainer}>
@@ -245,8 +284,8 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
   );
 
   // Calculate summary
-  const paidPayments = paymentHistory.filter(p => p.status === 'completed' || p.status === 'pago');
-  const pendingPayments = paymentHistory.filter(p => p.status === 'pending' || p.status === 'overdue' || p.status === 'pendente' || p.status === 'vencido');
+  const paidPayments = paymentHistory.filter(p => isPaymentCompleted(p.status));
+  const pendingPayments = paymentHistory.filter(p => isPaymentPending(p.status));
   const totalPaid = paidPayments.reduce((sum, p) => sum + p.amount, 0);
   const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
 
@@ -491,5 +530,18 @@ const styles = StyleSheet.create({
   },
   receiptButton: {
     flex: 1,
+  },
+  amountBreakdown: {
+    alignItems: 'flex-end',
+  },
+  baseAmountSmall: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  interestAmountSmall: {
+    fontSize: 12,
+    color: '#f44336',
+    fontWeight: '500',
   },
 });

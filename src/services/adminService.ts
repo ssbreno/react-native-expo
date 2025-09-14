@@ -14,6 +14,10 @@ export interface AdminUser extends User {
   total_payments?: number;
   last_payment?: string;
   status?: 'active' | 'inactive' | 'suspended';
+  payment_status?: 'up_to_date' | 'overdue' | 'no_payments';
+  days_overdue?: number;
+  pending_amount?: number;
+  vehicle_name?: string;
 }
 
 export const adminService = {
@@ -25,6 +29,48 @@ export const adminService = {
       return { 
         success: false, 
         error: error.response?.data?.error || 'Erro ao obter estatísticas do dashboard'
+      };
+    }
+  },
+
+  async getUsersWithPaymentStatus(): Promise<ApiResponse<AdminUser[]>> {
+    try {
+      const response = await api.get('/admin/users-payment-status');
+      let users = response.data.users || response.data;
+      
+      if (users && Array.isArray(users)) {
+        users = users.map((user: any) => ({
+          ...user,
+          payment_status: user.payment_status || 'no_payments'
+        }));
+      }
+      
+      return { 
+        success: true, 
+        data: users
+      };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Erro ao obter lista de usuários'
+      };
+    }
+  },
+
+  async getPaymentSummary(): Promise<ApiResponse<{
+    total_revenue: number;
+    pending_count: number;
+    overdue_count: number;
+    up_to_date_users: number;
+    overdue_users: number;
+  }>> {
+    try {
+      const response = await api.get('/admin/payment-summary');
+      return { success: true, data: response.data };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Erro ao obter resumo de pagamentos'
       };
     }
   },
