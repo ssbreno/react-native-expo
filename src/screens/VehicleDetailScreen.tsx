@@ -21,6 +21,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useVehicle } from '../contexts/VehicleContext';
 import { Vehicle, Payment } from '../types';
 import { formatCurrency, getPaymentStatus } from '../utils/dateUtils';
+import PixPaymentModal from '../components/PixPaymentModal';
+import { paymentService, PixPaymentData } from '../services/paymentService';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +42,9 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState<number | null>(null);
+  const [pixModalVisible, setPixModalVisible] = useState(false);
+  const [pixPaymentData, setPixPaymentData] = useState<PixPaymentData | null>(null);
+  const [generatingPix, setGeneratingPix] = useState(false);
   const theme = useTheme();
 
   useEffect(() => {
@@ -69,42 +74,48 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
     }
   };
 
-  const handlePayment = (payment: Payment) => {
-    Alert.alert(
-      'Processar Pagamento',
-      `Deseja pagar ${formatCurrency(payment.amount)} para ${payment.vehicleName}?`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'PIX', onPress: () => processPaymentWithMethod(payment.id.toString(), 'PIX') },
-        { text: 'Cartão', onPress: () => processPaymentWithMethod(payment.id.toString(), 'Cartão de Crédito') },
-        { text: 'Boleto', onPress: () => processPaymentWithMethod(payment.id.toString(), 'Boleto') }
-      ]
-    );
-  };
-
-  const processPaymentWithMethod = async (paymentId: string, method: any) => {
-    setProcessingPayment(parseInt(paymentId));
+  const handlePayment = async (payment: Payment) => {
+    setGeneratingPix(true);
+    setProcessingPayment(parseInt(payment.id.toString()));
     
     try {
-      const result = await processPayment(parseInt(paymentId), method);
+      console.log('[VehicleDetail] Gerando pagamento PIX para:', payment.id);
       
-      if (result.success) {
-        Alert.alert(
-          'Sucesso!',
-          result.message || 'Pagamento processado com sucesso!',
-          [{ text: 'OK', onPress: loadVehicleData }]
-        );
+      // Tenta obter QR code existente primeiro
+      let result = await paymentService.getPixQRCode(payment.id);
+      
+      // Se não existir, gera novo
+      if (!result.success) {
+        console.log('[VehicleDetail] Gerando novo QR code PIX');
+        result = await paymentService.generatePixQRCode(payment.id);
+      }
+      
+      if (result.success && result.data) {
+        console.log('[VehicleDetail] QR code PIX obtido com sucesso');
+        setPixPaymentData(result.data);
+        setPixModalVisible(true);
       } else {
-        Alert.alert(
-          'Erro',
-          result.error || 'Falha ao processar pagamento. Tente novamente.'
-        );
+        console.error('[VehicleDetail] Falha ao gerar PIX:', result.error);
+        Alert.alert('Erro', result.error || 'Erro ao gerar pagamento PIX');
       }
     } catch (error) {
-      Alert.alert('Erro', 'Erro interno. Tente novamente.');
+      console.error('[VehicleDetail] Erro ao processar pagamento:', error);
+      Alert.alert('Erro', 'Erro ao processar pagamento. Tente novamente.');
     } finally {
+      setGeneratingPix(false);
       setProcessingPayment(null);
     }
+  };
+
+  const handlePixPaymentConfirmed = () => {
+    setPixModalVisible(false);
+    setPixPaymentData(null);
+    loadVehicleData();
+  };
+
+  const handlePixModalDismiss = () => {
+    setPixModalVisible(false);
+    setPixPaymentData(null);
   };
 
   if (loading) {
@@ -308,13 +319,14 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
                       styles.payButton,
                       { backgroundColor: payment.status === 'overdue' ? '#f44336' : theme.colors.primary }
                     ]}
-                    disabled={isProcessing}
+                    disabled={isProcessing || generatingPix}
                     contentStyle={styles.payButtonContent}
+                    icon="qr-code"
                   >
-                    {isProcessing ? (
+                    {isProcessing || generatingPix ? (
                       <ActivityIndicator color="white" />
                     ) : (
-                      `Pagar ${formatCurrency(payment.amount)}`
+                      `Pagar ${formatCurrency(payment.amount)} via PIX`
                     )}
                   </Button>
                 </Surface>
@@ -325,6 +337,14 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
       )}
 
       <View style={styles.bottomSpacing} />
+      
+      {/* PIX Payment Modal */}
+      <PixPaymentModal
+        visible={pixModalVisible}
+        onDismiss={handlePixModalDismiss}
+        paymentData={pixPaymentData}
+        onPaymentConfirmed={handlePixPaymentConfirmed}
+      />
     </ScrollView>
   );
 }

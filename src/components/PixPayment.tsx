@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { paymentService, PixPaymentData } from '../services/paymentService';
 import { Vehicle } from '../types';
+import { Colors } from '../constants/colors';
 
 interface PixPaymentProps {
   paymentId: number;
@@ -147,7 +148,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHeader}>
                 <View style={styles.headerIcon}>
-                  <Ionicons name="qr-code" size={32} color="#32a852" />
+                  <Ionicons name="qr-code" size={32} color={Colors.primary} />
                 </View>
                 <Text style={styles.modalTitle}>Pagamento PIX Gerado</Text>
                 <TouchableOpacity 
@@ -176,7 +177,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
                     onPress={copyToClipboard}
                     style={styles.copyButton}
                   >
-                    <Ionicons name="copy-outline" size={20} color="#32a852" />
+                    <Ionicons name="copy-outline" size={20} color={Colors.primary} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -219,7 +220,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
                 onPress={copyToClipboard}
                 style={styles.copyActionButton}
               >
-                <Ionicons name="copy-outline" size={18} color="#32a852" />
+                <Ionicons name="copy-outline" size={18} color={Colors.primary} />
                 <Text style={styles.copyActionText}>Copiar Código</Text>
               </TouchableOpacity>
               
@@ -242,7 +243,7 @@ const styles = StyleSheet.create({
     marginVertical: 10,
   },
   payButton: {
-    backgroundColor: '#32a852',
+    backgroundColor: Colors.primary,
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderRadius: 8,
@@ -314,7 +315,7 @@ const styles = StyleSheet.create({
   amount: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#32a852',
+    color: Colors.primary,
     marginBottom: 4,
   },
   description: {
@@ -361,7 +362,7 @@ const styles = StyleSheet.create({
   instructionNumber: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#32a852',
+    color: Colors.primary,
     marginRight: 8,
     minWidth: 20,
   },
@@ -410,12 +411,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#32a852',
+    borderColor: Colors.primary,
     borderRadius: 8,
     gap: 6,
   },
   copyActionText: {
-    color: '#32a852',
+    color: Colors.primary,
     fontSize: 16,
     fontWeight: '500',
   },
@@ -424,7 +425,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    backgroundColor: '#6c757d',
+    backgroundColor: Colors.text.secondary,
     borderRadius: 8,
   },
   closeActionText: {

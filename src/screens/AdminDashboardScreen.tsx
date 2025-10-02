@@ -24,6 +24,7 @@ import { adminService, DashboardStats, AdminUser } from '../services/adminServic
 import { vehicleService } from '../services/vehicleService';
 import { formatCurrency } from '../utils/dateUtils';
 import { useAuth } from '../contexts/AuthContext';
+import { Colors } from '../constants/colors';
 
 interface AdminDashboardScreenProps {
   navigation: any;
@@ -712,7 +713,7 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: 14,
-    color: '#FF8C00',
+    color: Colors.primary,
     marginTop: 8,
     fontWeight: '500',
   },

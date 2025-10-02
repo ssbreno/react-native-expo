@@ -25,25 +25,29 @@ import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
 // Import types
 import { RootStackParamList, MainTabParamList } from './src/types';
 
+// Import colors
+import { Colors } from './src/constants/colors';
+
 // Navigation setup
 const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-// Custom theme - Nanquim Locações (Black, Orange, White)
+// Custom theme - Nanquim Locações (Azul, Preto, Branco)
 const theme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
-    primary: '#FF8C00', // Dark Orange
-    secondary: '#FFA500', // Orange
-    background: '#FFFFFF', // White
-    surface: '#FFFFFF', // White
-    accent: '#FF8C00', // Dark Orange
-    text: '#000000', // Black
-    placeholder: '#666666', // Dark Gray
-    backdrop: 'rgba(0, 0, 0, 0.5)', // Black backdrop
-    onSurface: '#000000', // Black text on surfaces
-    notification: '#FF8C00', // Orange for notifications
+    primary: Colors.primary, // Azul
+    secondary: Colors.secondary, // Preto
+    background: Colors.background.primary, // Branco
+    surface: Colors.background.card, // Branco
+    accent: Colors.primaryLight, // Azul claro
+    text: Colors.text.primary, // Preto
+    placeholder: Colors.text.secondary, // Cinza
+    backdrop: Colors.overlay, // Overlay preto
+    onSurface: Colors.text.primary, // Texto preto em superfícies
+    notification: Colors.primary, // Azul para notificações
+    error: Colors.error, // Vermelho para erros
   },
 };
 

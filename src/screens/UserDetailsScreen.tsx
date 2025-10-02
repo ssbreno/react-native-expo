@@ -21,6 +21,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { adminService, AdminUser } from '../services/adminService';
 import { vehicleService } from '../services/vehicleService';
 import { Vehicle } from '../types';
+import { Colors } from '../constants/colors';
 
 interface UserDetailsScreenProps {
   route: {
@@ -178,9 +179,9 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                 {user.is_admin && (
                   <Chip
                     mode="flat"
-                    textStyle={{ color: '#FF8C00', fontSize: 12 }}
+                    textStyle={{ color: Colors.primary, fontSize: 12 }}
                     style={{ 
-                      backgroundColor: '#FFF3E0',
+                      backgroundColor: '#E3F2FD',
                       marginTop: 8,
                       marginLeft: 8
                     }}

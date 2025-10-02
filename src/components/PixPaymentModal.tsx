@@ -23,6 +23,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { PixPaymentData, paymentService } from '../services/paymentService';
 import { formatCurrency } from '../utils/dateUtils';
 import { useVehicle } from '../contexts/VehicleContext';
+import { Colors } from '../constants/colors';
 
 interface PixPaymentModalProps {
   visible: boolean;
@@ -303,7 +304,7 @@ export default function PixPaymentModal({
                   </Text>
                   
                   <Text style={styles.interestLabel}>+ Juros de Atraso:</Text>
-                  <Text style={[styles.interestAmount, { color: '#f44336' }]}>
+                  <Text style={[styles.interestAmount, { color: Colors.error }]}>
                     {formatCurrency(paymentData.amount - paymentData.base_amount)}
                   </Text>
                   
@@ -417,7 +418,7 @@ export default function PixPaymentModal({
               <Button
                 mode="contained"
                 onPress={handlePaymentConfirmed}
-                style={[styles.actionButton, { backgroundColor: '#4caf50' }]}
+                style={[styles.actionButton, { backgroundColor: Colors.success }]}
                 icon="check-circle"
               >
                 Já Paguei
@@ -597,7 +598,7 @@ const styles = StyleSheet.create({
   },
   interestLabel: {
     fontSize: 14,
-    color: '#f44336',
+    color: Colors.error,
     marginTop: 8,
     marginBottom: 4,
   },

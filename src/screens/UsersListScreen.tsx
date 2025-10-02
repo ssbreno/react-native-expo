@@ -20,6 +20,7 @@ import {
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { adminService, AdminUser } from '../services/adminService';
+import { Colors } from '../constants/colors';
 
 interface UsersListScreenProps {
   navigation: any;
@@ -160,8 +161,8 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
 
             {user.is_admin && (
               <View style={styles.detailItem}>
-                <Ionicons name="shield-checkmark-outline" size={16} color="#FF8C00" />
-                <Text style={[styles.detailText, { color: '#FF8C00' }]}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={Colors.primary} />
+                <Text style={[styles.detailText, { color: Colors.primary }]}>
                   Administrador
                 </Text>
               </View>
