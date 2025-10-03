@@ -18,11 +18,11 @@ import {
   Divider
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { useVehicle } from '../contexts/VehicleContext';
-import { Vehicle, Payment } from '../types';
-import { formatCurrency, getPaymentStatus } from '../utils/dateUtils';
-import PixPaymentModal from '../components/PixPaymentModal';
-import { paymentService, PixPaymentData } from '../services/paymentService';
+import { useVehicle } from '../../contexts/VehicleContext';
+import { Vehicle, Payment } from '../../types';
+import { formatCurrency, getPaymentStatus } from '../../utils/dateUtils';
+import PixPaymentModal from '../../components/PixPaymentModal';
+import { paymentService, PixPaymentData } from '../../services/paymentService';
 
 const { width } = Dimensions.get('window');
 

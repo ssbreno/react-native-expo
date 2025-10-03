@@ -68,9 +68,9 @@ export interface Vehicle {
   license_plate: string;
   chassis: string;
   mileage: number;
-  fuel_type: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid';
+  fuel_type: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid' | 'flex';
   price: number;
-  status: 'ativo' | 'inativo';
+  status: 'ativo' | 'inativo' | 'available' | 'rented' | 'maintenance';
   description: string;
   created_at: string;
   updated_at: string;
@@ -197,7 +197,8 @@ export type RootStackParamList = {
   Main: undefined;
   AdminDashboard: undefined;
   UsersList: undefined;
-  UserDetails: { userId: number };
+  UserDetails: { userId: string };
+  UpdateOverduePayments: undefined;
   VehicleDetail: { vehicleId: number };
   VehicleEdit: { vehicleId: number };
 };

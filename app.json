@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nanquim Locações",
     "slug": "vehicle-rental-app",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nanquim.locacoes",
-      "buildNumber": "3",
+      "buildNumber": "5",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -49,7 +49,7 @@
         "backgroundColor": "#4169E1"
       },
       "package": "com.nanquim.locacoes",
-      "versionCode": 3,
+      "versionCode": 5,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE"

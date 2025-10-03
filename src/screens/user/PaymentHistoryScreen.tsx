@@ -18,12 +18,12 @@ import {
   Divider
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { useVehicle } from '../contexts/VehicleContext';
-import { Payment, PaymentMethod } from '../types';
-import { formatCurrency, formatDateTime, getPaymentStatus } from '../utils/dateUtils';
-import { paymentService } from '../services/paymentService';
-import PixPayment from '../components/PixPayment';
-import PaymentReceipt from '../components/PaymentReceipt';
+import { useVehicle } from '../../contexts/VehicleContext';
+import { Payment, PaymentMethod } from '../../types';
+import { formatCurrency, formatDateTime, getPaymentStatus } from '../../utils/dateUtils';
+import { paymentService } from '../../services/paymentService';
+import PixPayment from '../../components/PixPayment';
+import PaymentReceipt from '../../components/PaymentReceipt';
 
 interface PaymentHistoryScreenProps {
   navigation: any;

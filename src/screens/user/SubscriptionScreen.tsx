@@ -13,8 +13,8 @@ import {
   Divider,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { useVehicle } from '../contexts/VehicleContext';
-import { formatCurrency, formatDate } from '../utils/dateUtils';
+import { useVehicle } from '../../contexts/VehicleContext';
+import { formatCurrency, formatDate } from '../../utils/dateUtils';
 
 interface SubscriptionScreenProps {
   navigation: any;

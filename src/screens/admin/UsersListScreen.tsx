@@ -19,8 +19,8 @@ import {
   FAB
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { adminService, AdminUser } from '../services/adminService';
-import { Colors } from '../constants/colors';
+import { adminService, AdminUser } from '../../services/adminService';
+import { Colors } from '../../constants/colors';
 
 interface UsersListScreenProps {
   navigation: any;
@@ -49,6 +49,17 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
 
       if (result.success && result.data) {
         const allUsers = result.data.users || [];
+        
+        // Log para debug - verificar se license_plate está vindo
+        if (allUsers.length > 0) {
+          console.log('📋 UsersListScreen - Sample user data:', {
+            name: allUsers[0].name,
+            email: allUsers[0].email,
+            license_plate: allUsers[0].license_plate,
+            vehicle_name: allUsers[0].vehicle_name
+          });
+        }
+        
         const regularUsers = allUsers.filter(user => {
           const isAdminByEmail = user.email?.includes('admin');
           const isAdminByName = user.name?.toLowerCase().includes('administrador');
@@ -114,7 +125,7 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
   const renderUserCard = (user: AdminUser) => (
     <TouchableOpacity
       key={user.id}
-      onPress={() => navigateToUserDetails(user.id)}
+      onPress={() => navigateToUserDetails(user.id.toString())}
       style={styles.userCardContainer}
     >
       <Card style={styles.userCard}>
@@ -140,6 +151,15 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
               <Ionicons name="phone-portrait-outline" size={16} color="#666" />
               <Text style={styles.detailText}>{user.phone || 'Não informado'}</Text>
             </View>
+
+            {user.license_plate && (
+              <View style={styles.detailItem}>
+                <Ionicons name="car-outline" size={16} color={Colors.primary} />
+                <Text style={[styles.detailText, { color: Colors.primary, fontWeight: '600' }]}>
+                  {user.license_plate}
+                </Text>
+              </View>
+            )}
 
             {user.total_payments !== undefined && (
               <View style={styles.detailItem}>

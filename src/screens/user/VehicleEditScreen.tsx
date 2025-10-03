@@ -20,11 +20,11 @@ import {
   Divider,
 } from 'react-native-paper';
 import { StyleSheet } from 'react-native';
-import { vehicleService } from '../services/vehicleService';
-import { Vehicle, VehicleUpdateData } from '../types';
+import { vehicleService } from '../../services/vehicleService';
+import { Vehicle, VehicleUpdateData } from '../../types';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../types';
+import { RootStackParamList } from '../../types';
 
 type VehicleEditScreenNavigationProp = StackNavigationProp<RootStackParamList, 'VehicleEdit'>;
 type VehicleEditScreenRouteProp = RouteProp<RootStackParamList, 'VehicleEdit'>;

@@ -18,8 +18,8 @@ import {
   useTheme
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../contexts/AuthContext';
-import { useVehicle } from '../contexts/VehicleContext';
+import { useAuth } from '../../contexts/AuthContext';
+import { useVehicle } from '../../contexts/VehicleContext';
 
 interface ProfileScreenProps {
   navigation: any;

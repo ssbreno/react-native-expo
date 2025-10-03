@@ -18,6 +18,18 @@ export interface AdminUser extends User {
   days_overdue?: number;
   pending_amount?: number;
   vehicle_name?: string;
+  license_plate?: string;
+  weekly_amount?: number;
+  monthly_amount?: number;
+  // Vehicle information
+  vehicle_id?: number;
+  vehicle_brand?: string;
+  vehicle_model?: string;
+  vehicle_year?: number;
+  vehicle_color?: string;
+  rental_start?: string;
+  rental_expiration?: string;
+  rental_status?: string;
 }
 
 export const adminService = {
@@ -78,10 +90,21 @@ export const adminService = {
   async getAllUsers(page = 1, limit = 10): Promise<ApiResponse<{ users: AdminUser[], total: number, page: number }>> {
     try {
       const response = await api.get(`/admin/users?page=${page}&limit=${limit}`);
+      const users = response.data.users || response.data;
+      
+      // Log para verificar se a placa está vindo
+      if (users && users.length > 0) {
+        console.log('👥 First user sample:', {
+          name: users[0].name,
+          license_plate: users[0].license_plate,
+          vehicle_name: users[0].vehicle_name
+        });
+      }
+      
       return { 
         success: true, 
         data: {
-          users: response.data.users || response.data,
+          users: users,
           total: response.data.total || 0,
           page: response.data.page || page
         }
@@ -141,8 +164,15 @@ export const adminService = {
   async getUserDetails(userId: string): Promise<ApiResponse<AdminUser>> {
     try {
       const response = await api.get(`/admin/users/${userId}`);
-      return { success: true, data: response.data };
+      console.log('📡 API Response for user details:', JSON.stringify(response.data, null, 2));
+      
+      // Handle different response formats
+      const userData = response.data.user || response.data;
+      console.log('📦 Processed user data:', JSON.stringify(userData, null, 2));
+      
+      return { success: true, data: userData };
     } catch (error: any) {
+      console.error('❌ Error fetching user details:', error);
       return { 
         success: false, 
         error: error.response?.data?.error || 'Erro ao obter detalhes do usuário'
@@ -161,6 +191,46 @@ export const adminService = {
       return { 
         success: false, 
         error: error.response?.data?.error || 'Erro ao atualizar status do usuário'
+      };
+    }
+  },
+
+  async updateUserPaymentAmount(userId: string, weeklyAmount?: number, monthlyAmount?: number): Promise<ApiResponse> {
+    try {
+      const payload: { weekly_amount?: number; monthly_amount?: number } = {};
+      
+      if (weeklyAmount !== undefined && weeklyAmount !== null) {
+        payload.weekly_amount = weeklyAmount;
+      }
+      
+      if (monthlyAmount !== undefined && monthlyAmount !== null) {
+        payload.monthly_amount = monthlyAmount;
+      }
+
+      await api.patch(`/admin/users/${userId}/payment-amount`, payload);
+      return { 
+        success: true, 
+        message: 'Valor de pagamento atualizado com sucesso'
+      };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Erro ao atualizar valor de pagamento'
+      };
+    }
+  },
+
+  async updateUserInfo(userId: string, data: { name: string; email: string; phone: string; address: string }): Promise<ApiResponse> {
+    try {
+      await api.patch(`/admin/users/${userId}`, data);
+      return { 
+        success: true, 
+        message: 'Informações do usuário atualizadas com sucesso'
+      };
+    } catch (error: any) {
+      return { 
+        success: false, 
+        error: error.response?.data?.error || 'Erro ao atualizar informações do usuário'
       };
     }
   },

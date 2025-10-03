@@ -13,14 +13,19 @@ import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { VehicleProvider } from './src/contexts/VehicleContext';
 
 // Import screens
-import LoginScreen from './src/screens/LoginScreen';
-import VehicleListScreen from './src/screens/VehicleListScreen';
-import VehicleDetailScreen from './src/screens/VehicleDetailScreen';
-import VehicleEditScreen from './src/screens/VehicleEditScreen';
-import PaymentHistoryScreen from './src/screens/PaymentHistoryScreen';
-import SubscriptionScreen from './src/screens/SubscriptionScreen';
-import ProfileScreen from './src/screens/ProfileScreen';
-import AdminDashboardScreen from './src/screens/AdminDashboardScreen';
+// Auth screens
+import LoginScreen from './src/screens/auth/LoginScreen';
+
+// User screens
+import VehicleListScreen from './src/screens/user/VehicleListScreen';
+import VehicleDetailScreen from './src/screens/user/VehicleDetailScreen';
+import VehicleEditScreen from './src/screens/user/VehicleEditScreen';
+import PaymentHistoryScreen from './src/screens/user/PaymentHistoryScreen';
+import SubscriptionScreen from './src/screens/user/SubscriptionScreen';
+import ProfileScreen from './src/screens/user/ProfileScreen';
+
+// Admin screens
+import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
 
 // Import types
 import { RootStackParamList, MainTabParamList } from './src/types';
@@ -172,7 +177,7 @@ function AppNavigator() {
           />
           <Stack.Screen 
             name="UsersList" 
-            component={require('./src/screens/UsersListScreen').default}
+            component={require('./src/screens/admin/UsersListScreen').default}
             options={{ 
               title: 'Lista de Usuários',
               headerBackTitle: 'Voltar'
@@ -180,9 +185,17 @@ function AppNavigator() {
           />
           <Stack.Screen 
             name="UserDetails" 
-            component={require('./src/screens/UserDetailsScreen').default}
+            component={require('./src/screens/admin/UserDetailsScreen').default}
             options={{ 
               title: 'Detalhes do Usuário',
+              headerBackTitle: 'Voltar'
+            }}
+          />
+          <Stack.Screen 
+            name="UpdateOverduePayments" 
+            component={require('./src/screens/admin/UpdateOverduePaymentsScreen').default}
+            options={{ 
+              title: 'Pagamentos Vencidos',
               headerBackTitle: 'Voltar'
             }}
           />
@@ -213,7 +226,7 @@ function AppNavigator() {
           />
           <Stack.Screen 
             name="UsersList" 
-            component={require('./src/screens/UsersListScreen').default}
+            component={require('./src/screens/admin/UsersListScreen').default}
             options={{ 
               title: 'Lista de Usuários',
               headerBackTitle: 'Voltar'
@@ -221,7 +234,7 @@ function AppNavigator() {
           />
           <Stack.Screen 
             name="UserDetails" 
-            component={require('./src/screens/UserDetailsScreen').default}
+            component={require('./src/screens/admin/UserDetailsScreen').default}
             options={{ 
               title: 'Detalhes do Usuário',
               headerBackTitle: 'Voltar'

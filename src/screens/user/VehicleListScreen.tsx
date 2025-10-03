@@ -20,9 +20,9 @@ import {
   useTheme
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { useVehicle } from '../contexts/VehicleContext';
-import { Vehicle, Payment } from '../types';
-import { formatCurrency, formatDate } from '../utils/dateUtils';
+import { useVehicle } from '../../contexts/VehicleContext';
+import { Vehicle, Payment } from '../../types';
+import { formatCurrency, formatDate } from '../../utils/dateUtils';
 
 const { width } = Dimensions.get('window');
 

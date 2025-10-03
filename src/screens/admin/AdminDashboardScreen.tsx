@@ -20,11 +20,11 @@ import {
   SegmentedButtons
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
-import { adminService, DashboardStats, AdminUser } from '../services/adminService';
-import { vehicleService } from '../services/vehicleService';
-import { formatCurrency } from '../utils/dateUtils';
-import { useAuth } from '../contexts/AuthContext';
-import { Colors } from '../constants/colors';
+import { adminService, DashboardStats, AdminUser } from '../../services/adminService';
+import { vehicleService } from '../../services/vehicleService';
+import { formatCurrency } from '../../utils/dateUtils';
+import { useAuth } from '../../contexts/AuthContext';
+import { Colors } from '../../constants/colors';
 
 interface AdminDashboardScreenProps {
   navigation: any;
@@ -99,6 +99,17 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
 
       if (usersResult.success && usersResult.data) {
         const allUsers = usersResult.data.users || [];
+        
+        // Log para debug - verificar dados dos usuários recentes
+        if (allUsers.length > 0) {
+          console.log('📊 Dashboard - Recent users sample:', {
+            name: allUsers[0].name,
+            email: allUsers[0].email,
+            license_plate: allUsers[0].license_plate,
+            vehicle_name: allUsers[0].vehicle_name
+          });
+        }
+        
         const regularUsers = allUsers.filter((user: AdminUser) => {
           const isAdminByEmail = user.email?.includes('admin');
           const isAdminByName = user.name?.toLowerCase().includes('administrador');
@@ -256,6 +267,14 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                     <Ionicons name="car-outline" size={16} color="#4CAF50" />
                     <Text style={[styles.contactText, { color: '#4CAF50', fontWeight: '500' }]}>
                       {user.vehicle_name}
+                    </Text>
+                  </View>
+                )}
+                {user.license_plate && (
+                  <View style={styles.contactRow}>
+                    <Ionicons name="card-outline" size={16} color={Colors.primary} />
+                    <Text style={[styles.contactText, { color: Colors.primary, fontWeight: '600', letterSpacing: 1 }]}>
+                      {user.license_plate}
                     </Text>
                   </View>
                 )}
@@ -556,87 +575,13 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
 
         <Button
           mode="outlined"
-          onPress={() => Alert.alert('Em Desenvolvimento', 'Funcionalidade em desenvolvimento')}
+          onPress={() => navigation.navigate('UpdateOverduePayments')}
           style={styles.actionButton}
-          icon="receipt-outline"
+          icon="cash-outline"
         >
-          Gerenciar Pagamentos
+          Atualizar Pagamentos Vencidos
         </Button>
       </Surface>
-
-      {/* Payment Status Summary */}
-      {paymentSummary && (
-        <Surface style={styles.summaryCard}>
-          <Title style={styles.sectionTitle}>Resumo de Pagamentos</Title>
-          <View style={styles.summaryGrid}>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{paymentSummary.up_to_date_users || 0}</Text>
-              <Text style={[styles.summaryLabel, { color: '#4CAF50' }]}>Em Dia</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{paymentSummary.overdue_users || 0}</Text>
-              <Text style={[styles.summaryLabel, { color: '#F44336' }]}>Vencidos</Text>
-            </View>
-            <View style={styles.summaryItem}>
-              <Text style={styles.summaryValue}>{formatCurrency(paymentSummary.total_revenue || 0)}</Text>
-              <Text style={[styles.summaryLabel, { color: '#FF9800' }]}>Receita Total</Text>
-            </View>
-          </View>
-        </Surface>
-      )}
-
-      {/* Quick Stats */}
-      {renderQuickStats()}
-
-      {/* Users with Payment Status */}
-      {usersWithPaymentStatus.length > 0 && (
-        <Surface style={styles.usersSection}>
-          <View style={styles.sectionHeader}>
-            <Title style={styles.sectionTitle}>Status de Pagamentos dos Usuários</Title>
-          </View>
-          
-          {/* Filter Buttons */}
-          <View style={styles.filterContainer}>
-            <SegmentedButtons
-              value={statusFilter}
-              onValueChange={filterUsersByStatus}
-              buttons={[
-                { value: 'all', label: 'Todos' },
-                { value: 'up_to_date', label: 'Em Dia' },
-                { value: 'overdue', label: 'Vencidos' },
-                { value: 'no_payments', label: 'Sem Pag.' }
-              ]}
-              style={styles.segmentedButtons}
-            />
-          </View>
-          
-          {filteredUsers.length > 0 ? (
-            <>
-              <Text style={styles.resultCount}>
-                {filteredUsers.length} usuário{filteredUsers.length !== 1 ? 's' : ''} 
-                {statusFilter !== 'all' && `com status "${statusFilter === 'up_to_date' ? 'Em Dia' : statusFilter === 'overdue' ? 'Vencidos' : 'Sem Pagamentos'}"`}
-              </Text>
-              {filteredUsers.slice(0, 10).map(user => renderEnhancedUserCard(user, true))}
-              
-              {/* Ver todos moved to bottom */}
-              <View style={styles.seeAllContainer}>
-                <TouchableOpacity onPress={() => navigation.navigate('UsersList')}>
-                  <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>
-                    Ver todos
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={48} color="#ccc" />
-              <Text style={styles.emptyStateText}>
-                Nenhum usuário encontrado {statusFilter !== 'all' && 'com este status'}
-              </Text>
-            </View>
-          )}
-        </Surface>
-      )}
 
       {/* Recent Users */}
       <Surface style={styles.usersSection}>
@@ -650,23 +595,6 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
         </View>
         
         {users.map(user => renderEnhancedUserCard(user, false))}
-      </Surface>
-
-      {/* Admin Info */}
-      <Surface style={styles.infoCard}>
-        <Title style={styles.sectionTitle}>Informações do Sistema</Title>
-        <View style={styles.infoItem}>
-          <Ionicons name="server-outline" size={20} color="#666" />
-          <Text style={styles.infoText}>API: Vehicles Go</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Ionicons name="shield-checkmark-outline" size={20} color="#666" />
-          <Text style={styles.infoText}>Admin: admin@vehicles.com</Text>
-        </View>
-        <View style={styles.infoItem}>
-          <Ionicons name="card-outline" size={20} color="#666" />
-          <Text style={styles.infoText}>Pagamento: PIX via Abacate Pay</Text>
-        </View>
       </Surface>
     </ScrollView>
   );
@@ -853,24 +781,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
-  },
-  infoCard: {
-    margin: 16,
-    padding: 20,
-    elevation: 2,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    marginBottom: 32,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 12,
   },
   summaryCard: {
     margin: 16,
