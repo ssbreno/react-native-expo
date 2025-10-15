@@ -148,7 +148,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
             <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHeader}>
                 <View style={styles.headerIcon}>
-                  <Ionicons name="qr-code" size={32} color={Colors.primary} />
+                  <Ionicons name="qr-code-outline" size={32} color={Colors.primary} />
                 </View>
                 <Text style={styles.modalTitle}>Pagamento PIX Gerado</Text>
                 <TouchableOpacity 

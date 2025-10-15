@@ -2,7 +2,7 @@
   "expo": {
     "name": "Nanquim Locações",
     "slug": "vehicle-rental-app",
-    "version": "1.0.4",
+    "version": "1.0.6",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#4169E1"
+      "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -18,7 +18,8 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nanquim.locacoes",
-      "buildNumber": "5",
+      "buildNumber": "6",
+      "icon": "./assets/MASTER_1024.png",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -44,12 +45,13 @@
       }
     },
     "android": {
+      "icon": "./assets/Android/playstore-icon-512.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#4169E1"
+        "backgroundColor": "#FFFFFF"
       },
       "package": "com.nanquim.locacoes",
-      "versionCode": 5,
+      "versionCode": 6,
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE"
@@ -65,7 +67,7 @@
       "EXPO_PUBLIC_API_URL": "https://vehicles-go-production.up.railway.app/api/v1",
       "EXPO_PUBLIC_DEBUG": "true",
       "EXPO_PUBLIC_APP_NAME": "Vehicles Go",
-      "EXPO_PUBLIC_APP_VERSION": "1.0.1",
+      "EXPO_PUBLIC_APP_VERSION": "1.0.6",
       "EXPO_PUBLIC_API_TIMEOUT": "10000",
       "EXPO_PUBLIC_API_RETRY_ATTEMPTS": "3",
       "EXPO_PUBLIC_API_RETRY_DELAY": "1000",

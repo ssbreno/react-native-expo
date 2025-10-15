@@ -306,8 +306,12 @@ export const paymentService = {
         data: paymentData
       };
     } catch (error: any) {
-      console.error(`[PaymentService] Erro ao verificar status do pagamento ${paymentId}:`, error);
-      console.error(`[PaymentService] Detalhes do erro:`, error.response?.data);
+      // Silently handle 404 errors as they are expected when payment is not found
+      const status = error.response?.status;
+      if (status !== 404) {
+        console.error(`[PaymentService] Erro ao verificar status do pagamento ${paymentId}:`, error);
+        console.error(`[PaymentService] Detalhes do erro:`, error.response?.data);
+      }
       return {
         success: false,
         error: error.response?.data?.error || error.response?.data?.message || 'Erro ao verificar status do pagamento'

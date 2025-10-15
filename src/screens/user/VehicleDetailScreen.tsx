@@ -321,7 +321,6 @@ export default function VehicleDetailScreen({ route, navigation }: VehicleDetail
                     ]}
                     disabled={isProcessing || generatingPix}
                     contentStyle={styles.payButtonContent}
-                    icon="qr-code"
                   >
                     {isProcessing || generatingPix ? (
                       <ActivityIndicator color="white" />

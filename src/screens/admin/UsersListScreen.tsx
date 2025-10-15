@@ -20,6 +20,7 @@ import {
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { adminService, AdminUser } from '../../services/adminService';
+import { formatCurrency } from '../../utils/dateUtils';
 import { Colors } from '../../constants/colors';
 
 interface UsersListScreenProps {
@@ -44,11 +45,29 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
     try {
       if (reset) setLoading(true);
       
-      const result = await adminService.getAllUsers(pageNum, 20);
-      console.log('👥 Users loaded:', result);
+      // Load users with payment status information
+      const [usersResult, paymentStatusResult] = await Promise.all([
+        adminService.getAllUsers(pageNum, 100),
+        adminService.getUsersWithPaymentStatus()
+      ]);
+      
+      console.log('👥 Users loaded:', usersResult);
+      console.log('💰 Payment status loaded:', paymentStatusResult);
 
-      if (result.success && result.data) {
-        const allUsers = result.data.users || [];
+      if (usersResult.success && usersResult.data) {
+        let allUsers = usersResult.data.users || [];
+        
+        // Merge payment status data
+        if (paymentStatusResult.success && paymentStatusResult.data) {
+          const paymentStatusMap = new Map(
+            paymentStatusResult.data.map((u: AdminUser) => [u.id, u])
+          );
+          
+          allUsers = allUsers.map((user: AdminUser) => {
+            const paymentData = paymentStatusMap.get(user.id);
+            return paymentData ? { ...user, ...paymentData } : user;
+          });
+        }
         
         // Log para debug - verificar se license_plate está vindo
         if (allUsers.length > 0) {
@@ -56,11 +75,12 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
             name: allUsers[0].name,
             email: allUsers[0].email,
             license_plate: allUsers[0].license_plate,
-            vehicle_name: allUsers[0].vehicle_name
+            vehicle_name: allUsers[0].vehicle_name,
+            payment_status: allUsers[0].payment_status
           });
         }
         
-        const regularUsers = allUsers.filter(user => {
+        const regularUsers = allUsers.filter((user: AdminUser) => {
           const isAdminByEmail = user.email?.includes('admin');
           const isAdminByName = user.name?.toLowerCase().includes('administrador');
           const isAdminByField = user.is_admin === true;
@@ -70,10 +90,10 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
         });
         setUsers(reset ? regularUsers : [...users, ...regularUsers]);
         setTotal(regularUsers.length);
-        setHasMore(regularUsers.length === 20);
+        setHasMore(regularUsers.length === 100);
         setPage(pageNum);
       } else {
-        Alert.alert('Erro', result.error || 'Erro ao carregar usuários');
+        Alert.alert('Erro', usersResult.error || 'Erro ao carregar usuários');
       }
     } catch (error) {
       console.error('Erro ao carregar usuários:', error);
@@ -99,21 +119,30 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
     navigation.navigate('UserDetails', { userId });
   };
 
-  const getStatusColor = (status?: string) => {
+  const getPaymentStatusColor = (status?: string) => {
     switch (status) {
-      case 'active': return '#4CAF50';
-      case 'inactive': return '#FF9800';
-      case 'suspended': return '#F44336';
-      default: return '#757575';
+      case 'up_to_date': return { bg: '#E8F5E8', text: '#2E7D32' };
+      case 'overdue': return { bg: '#FFEBEE', text: '#D32F2F' };
+      case 'no_payments': return { bg: '#FFF3E0', text: '#F57C00' };
+      default: return { bg: '#F5F5F5', text: '#757575' };
     }
   };
 
-  const getStatusText = (status?: string) => {
+  const getPaymentStatusText = (status?: string) => {
     switch (status) {
-      case 'active': return 'Ativo';
-      case 'inactive': return 'Inativo';
-      case 'suspended': return 'Suspenso';
-      default: return 'Desconhecido';
+      case 'up_to_date': return 'Em Dia';
+      case 'overdue': return 'Vencido';
+      case 'no_payments': return 'Sem Pagamentos';
+      default: return 'Indefinido';
+    }
+  };
+
+  const getPaymentStatusIcon = (status?: string) => {
+    switch (status) {
+      case 'up_to_date': return 'checkmark-circle';
+      case 'overdue': return 'alert-circle';
+      case 'no_payments': return 'information-circle';
+      default: return 'help-circle';
     }
   };
 
@@ -122,76 +151,110 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
     user.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderUserCard = (user: AdminUser) => (
-    <TouchableOpacity
-      key={user.id}
-      onPress={() => navigateToUserDetails(user.id.toString())}
-      style={styles.userCardContainer}
-    >
-      <Card style={styles.userCard}>
-        <Card.Content>
-          <View style={styles.userHeader}>
-            <View style={styles.userInfo}>
-              <Title style={styles.userName}>{user.name}</Title>
-              <Text style={styles.userEmail}>{user.email}</Text>
-            </View>
-            <View style={styles.userStatus}>
-              <Chip
-                mode="outlined"
-                textStyle={{ color: getStatusColor(user.status), fontSize: 12 }}
-                style={{ borderColor: getStatusColor(user.status) }}
-              >
-                {getStatusText(user.status)}
-              </Chip>
-            </View>
-          </View>
+  const renderUserCard = (user: AdminUser) => {
+    const paymentStatus = getPaymentStatusColor(user.payment_status);
+    const paymentStatusText = getPaymentStatusText(user.payment_status);
+    const paymentStatusIcon = getPaymentStatusIcon(user.payment_status);
 
-          <View style={styles.userDetails}>
-            <View style={styles.detailItem}>
-              <Ionicons name="phone-portrait-outline" size={16} color="#666" />
-              <Text style={styles.detailText}>{user.phone || 'Não informado'}</Text>
+    return (
+      <TouchableOpacity
+        key={user.id}
+        onPress={() => navigateToUserDetails(user.id.toString())}
+        style={styles.userCardContainer}
+        activeOpacity={0.7}
+      >
+        <Card style={styles.userCard}>
+          <Card.Content>
+            <View style={styles.userHeader}>
+              <View style={styles.userInfo}>
+                <View style={styles.userNameRow}>
+                  <Title style={styles.userName}>{user.name}</Title>
+                  <Ionicons name="chevron-forward" size={20} color="#999" />
+                </View>
+                <Text style={styles.userEmail}>{user.email}</Text>
+                <View style={styles.contactRow}>
+                  <Ionicons name="call-outline" size={14} color="#666" />
+                  <Text style={styles.phoneText}>{user.phone || 'N/A'}</Text>
+                </View>
+              </View>
             </View>
 
-            {user.license_plate && (
-              <View style={styles.detailItem}>
-                <Ionicons name="car-outline" size={16} color={Colors.primary} />
-                <Text style={[styles.detailText, { color: Colors.primary, fontWeight: '600' }]}>
-                  {user.license_plate}
+            {/* Payment Status Badge */}
+            <View style={styles.paymentStatusBadge}>
+              <View style={[styles.statusBadge, { backgroundColor: paymentStatus.bg }]}>
+                <Ionicons name={paymentStatusIcon as any} size={18} color={paymentStatus.text} />
+                <Text style={[styles.statusBadgeText, { color: paymentStatus.text }]}>
+                  {paymentStatusText}
                 </Text>
+              </View>
+            </View>
+
+            {/* Vehicle Info */}
+            {(user.vehicle_name || user.license_plate) && (
+              <View style={styles.vehicleSection}>
+                {user.vehicle_name && (
+                  <View style={styles.vehicleItem}>
+                    <Ionicons name="car-outline" size={16} color="#4CAF50" />
+                    <Text style={styles.vehicleText}>{user.vehicle_name}</Text>
+                  </View>
+                )}
+                {user.license_plate && (
+                  <View style={styles.licensePlateContainer}>
+                    <Ionicons name="card-outline" size={16} color={Colors.primary} />
+                    <Text style={styles.licensePlateText}>{user.license_plate}</Text>
+                  </View>
+                )}
               </View>
             )}
 
-            {user.total_payments !== undefined && (
-              <View style={styles.detailItem}>
-                <Ionicons name="card-outline" size={16} color="#666" />
-                <Text style={styles.detailText}>
-                  {user.total_payments} pagamentos
-                </Text>
+            {/* Enhanced Payment Information */}
+            <View style={styles.paymentInfoSection}>
+              <View style={styles.paymentInfoGrid}>
+                <View style={styles.paymentInfoItem}>
+                  <Ionicons name="wallet-outline" size={20} color="#4CAF50" />
+                  <View style={styles.paymentInfoContent}>
+                    <Text style={styles.paymentInfoLabel}>Total</Text>
+                    <Text style={styles.paymentInfoValue}>{user.total_payments || 0}</Text>
+                  </View>
+                </View>
+                
+                <View style={styles.paymentInfoItem}>
+                  <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+                  <View style={styles.paymentInfoContent}>
+                    <Text style={styles.paymentInfoLabel}>Último</Text>
+                    <Text style={styles.paymentInfoValue}>
+                      {user.last_payment 
+                        ? new Date(user.last_payment).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                        : 'N/A'
+                      }
+                    </Text>
+                  </View>
+                </View>
               </View>
-            )}
 
-            {user.last_payment && (
-              <View style={styles.detailItem}>
-                <Ionicons name="time-outline" size={16} color="#666" />
-                <Text style={styles.detailText}>
-                  Último: {new Date(user.last_payment).toLocaleDateString('pt-BR')}
-                </Text>
-              </View>
-            )}
-
-            {user.is_admin && (
-              <View style={styles.detailItem}>
-                <Ionicons name="shield-checkmark-outline" size={16} color={Colors.primary} />
-                <Text style={[styles.detailText, { color: Colors.primary }]}>
-                  Administrador
-                </Text>
-              </View>
-            )}
-          </View>
-        </Card.Content>
-      </Card>
-    </TouchableOpacity>
-  );
+              {/* Overdue Information */}
+              {user.payment_status === 'overdue' && (
+                <View style={styles.overdueAlert}>
+                  <View style={styles.overdueRow}>
+                    <Ionicons name="time-outline" size={16} color="#D32F2F" />
+                    <Text style={styles.overdueText}>
+                      {user.days_overdue || 0} dias em atraso
+                    </Text>
+                  </View>
+                  <View style={styles.overdueRow}>
+                    <Ionicons name="cash-outline" size={16} color="#D32F2F" />
+                    <Text style={styles.overdueAmount}>
+                      {formatCurrency(user.pending_amount || 0)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </Card.Content>
+        </Card>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading && users.length === 0) {
     return (
@@ -336,5 +399,121 @@ const styles = StyleSheet.create({
   loadMoreText: {
     fontSize: 14,
     color: '#666',
+  },
+  userNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  contactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  phoneText: {
+    fontSize: 13,
+    color: '#666',
+  },
+  paymentStatusBadge: {
+    marginTop: 12,
+    marginBottom: 12,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  statusBadgeText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  vehicleSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#E0E0E0',
+    marginVertical: 12,
+  },
+  vehicleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  vehicleText: {
+    fontSize: 14,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  licensePlateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  licensePlateText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  paymentInfoSection: {
+    backgroundColor: '#F8F9FA',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  paymentInfoGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    gap: 16,
+  },
+  paymentInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flex: 1,
+  },
+  paymentInfoContent: {
+    flex: 1,
+  },
+  paymentInfoLabel: {
+    fontSize: 11,
+    color: '#666',
+    marginBottom: 2,
+  },
+  paymentInfoValue: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#000',
+  },
+  overdueAlert: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#FFCDD2',
+    gap: 6,
+  },
+  overdueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  overdueText: {
+    fontSize: 13,
+    color: '#D32F2F',
+    fontWeight: '500',
+  },
+  overdueAmount: {
+    fontSize: 13,
+    color: '#D32F2F',
+    fontWeight: '700',
   },
 });

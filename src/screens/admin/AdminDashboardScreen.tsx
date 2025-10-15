@@ -216,144 +216,76 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
   );
 
   const renderEnhancedUserCard = (user: AdminUser, showPaymentStatus = false) => {
-    // Debug: Log user data to see what we're receiving
-    if (showPaymentStatus) {
-      console.log('🔍 renderEnhancedUserCard - User:', {
-        id: user.id,
-        name: user.name,
-        payment_status: user.payment_status,
-        status: user.status,
-        showPaymentStatus
-      });
-    }
-
-    const getStatusColor = (status?: string) => {
-      if (showPaymentStatus) {
-        // If payment_status is not defined, treat as 'no_payments'
-        const actualStatus = status || 'no_payments';
-        switch (actualStatus) {
-          case 'up_to_date': return { bg: '#E8F5E8', text: '#2E7D32', label: 'Em Dia' };
-          case 'overdue': return { bg: '#FFEBEE', text: '#D32F2F', label: 'Vencido' };
-          case 'no_payments': return { bg: '#FFF3E0', text: '#F57C00', label: 'Sem Pagamentos' };
-          default: return { bg: '#FFF3E0', text: '#F57C00', label: 'Sem Pagamentos' };
-        }
-      } else {
-        return user.status === 'active' 
-          ? { bg: '#E8F5E8', text: '#2E7D32', label: 'Ativo' }
-          : { bg: '#FFF3E0', text: '#F57C00', label: 'Inativo' };
-      }
-    };
-
-    const statusInfo = getStatusColor(showPaymentStatus ? user.payment_status : user.status);
-
     return (
-      <Card key={user.id} style={styles.enhancedUserCard}>
-        <Card.Content>
-          <View style={styles.userHeader}>
-            <View style={styles.userMainInfo}>
-              <Title style={styles.userName}>{user.name}</Title>
-              
-              <View style={styles.contactInfo}>
-                <View style={styles.contactRow}>
-                  <Ionicons name="mail-outline" size={16} color="#666" />
-                  <Text style={styles.contactText}>{user.email}</Text>
+      <TouchableOpacity 
+        key={user.id}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('UserDetails', { userId: user.id })}
+      >
+        <Card style={styles.enhancedUserCard}>
+          <Card.Content>
+            <View style={styles.userHeader}>
+              <View style={styles.userMainInfo}>
+                <View style={styles.userNameHeader}>
+                  <Title style={styles.userName}>{user.name}</Title>
+                  <Ionicons name="chevron-forward" size={20} color="#666" />
                 </View>
-                <View style={styles.contactRow}>
-                  <Ionicons name="call-outline" size={16} color="#666" />
-                  <Text style={styles.contactText}>{user.phone || 'N/A'}</Text>
-                </View>
-                {user.vehicle_name && (
+                
+                <View style={styles.contactInfo}>
                   <View style={styles.contactRow}>
-                    <Ionicons name="car-outline" size={16} color="#4CAF50" />
-                    <Text style={[styles.contactText, { color: '#4CAF50', fontWeight: '500' }]}>
-                      {user.vehicle_name}
-                    </Text>
+                    <Ionicons name="mail-outline" size={16} color="#666" />
+                    <Text style={styles.contactText}>{user.email}</Text>
                   </View>
-                )}
-                {user.license_plate && (
                   <View style={styles.contactRow}>
-                    <Ionicons name="card-outline" size={16} color={Colors.primary} />
-                    <Text style={[styles.contactText, { color: Colors.primary, fontWeight: '600', letterSpacing: 1 }]}>
-                      {user.license_plate}
-                    </Text>
+                    <Ionicons name="call-outline" size={16} color="#666" />
+                    <Text style={styles.contactText}>{user.phone || 'N/A'}</Text>
                   </View>
-                )}
-              </View>
-              
-              {/* Status chip moved to bottom of user info */}
-              <View style={styles.statusChipContainer}>
-                <Chip 
-                  mode="flat" 
-                  style={[
-                    styles.modernStatusChip,
-                    { backgroundColor: statusInfo.bg }
-                  ]}
-                  textStyle={{ 
-                    color: statusInfo.text,
-                    fontWeight: '600',
-                    fontSize: 12
-                  }}
-                >
-                  {statusInfo.label}
-                </Chip>
+                  {user.vehicle_name && (
+                    <View style={styles.contactRow}>
+                      <Ionicons name="car-outline" size={16} color="#4CAF50" />
+                      <Text style={[styles.contactText, { color: '#4CAF50', fontWeight: '500' }]}>
+                        {user.vehicle_name}
+                      </Text>
+                    </View>
+                  )}
+                  {user.license_plate && (
+                    <View style={styles.contactRow}>
+                      <Ionicons name="card-outline" size={16} color={Colors.primary} />
+                      <Text style={[styles.contactText, { color: Colors.primary, fontWeight: '600', letterSpacing: 1 }]}>
+                        {user.license_plate}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
-          </View>
-          
-          <Divider style={styles.modernDivider} />
-          
-          {showPaymentStatus && user.payment_status ? (
-            <View style={styles.paymentStatusInfo}>
-              {user.payment_status === 'overdue' && (
-                <View style={styles.overdueInfo}>
-                  <View style={styles.overdueItem}>
-                    <Ionicons name="time-outline" size={18} color="#D32F2F" />
-                    <Text style={styles.overdueLabel}>Dias em Atraso</Text>
-                    <Text style={styles.overdueValue}>{user.days_overdue || 0}</Text>
+            
+            <Divider style={styles.modernDivider} />
+            
+            {/* Enhanced Payment Information - Always visible */}
+            <View style={styles.enhancedPaymentSection}>
+              <View style={styles.paymentRow}>
+                <View style={styles.paymentInfoItem}>
+                  <Ionicons name="wallet-outline" size={20} color="#4CAF50" />
+                  <View style={styles.paymentInfoText}>
+                    <Text style={styles.paymentInfoLabel}>Total de Pagamentos</Text>
+                    <Text style={styles.paymentInfoValue}>{user.total_payments || 0}</Text>
                   </View>
-                  <View style={styles.overdueItem}>
-                    <Ionicons name="cash-outline" size={18} color="#D32F2F" />
-                    <Text style={styles.overdueLabel}>Valor Pendente</Text>
-                    <Text style={styles.overdueValue}>
-                      {formatCurrency(user.pending_amount || 0)}
+                </View>
+                <View style={styles.paymentInfoItem}>
+                  <Ionicons name="calendar-outline" size={20} color="#2196F3" />
+                  <View style={styles.paymentInfoText}>
+                    <Text style={styles.paymentInfoLabel}>Último Pagamento</Text>
+                    <Text style={styles.paymentInfoValue}>
+                      {user.last_payment ? new Date(user.last_payment).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'N/A'}
                     </Text>
                   </View>
                 </View>
-              )}
-              
-              {user.payment_status === 'up_to_date' && user.last_payment && (
-                <View style={styles.upToDateInfo}>
-                  <Ionicons name="checkmark-circle-outline" size={18} color="#4CAF50" />
-                  <Text style={styles.upToDateLabel}>Último Pagamento</Text>
-                  <Text style={styles.upToDateValue}>
-                    {new Date(user.last_payment).toLocaleDateString('pt-BR')}
-                  </Text>
-                </View>
-              )}
-              
-              {user.payment_status === 'no_payments' && (
-                <View style={styles.noPaymentsInfo}>
-                  <Ionicons name="alert-circle-outline" size={18} color="#FF9800" />
-                  <Text style={styles.noPaymentsText}>Nenhum pagamento registrado</Text>
-                </View>
-              )}
-            </View>
-          ) : (
-            <View style={styles.basicPaymentInfo}>
-              <View style={styles.paymentStat}>
-                <Text style={styles.paymentStatLabel}>Total de Pagamentos</Text>
-                <Text style={styles.paymentStatValue}>{user.total_payments || 0}</Text>
-              </View>
-              <View style={styles.paymentStat}>
-                <Text style={styles.paymentStatLabel}>Último Pagamento</Text>
-                <Text style={styles.paymentStatValue}>
-                  {user.last_payment ? new Date(user.last_payment).toLocaleDateString('pt-BR') : 'N/A'}
-                </Text>
               </View>
             </View>
-          )}
-        </Card.Content>
-      </Card>
+          </Card.Content>
+        </Card>
+      </TouchableOpacity>
     );
   };
 
@@ -992,5 +924,41 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     borderTopWidth: 1,
     borderTopColor: '#E0E0E0',
+  },
+  userNameHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  enhancedPaymentSection: {
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 16,
+  },
+  paymentInfoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  paymentInfoText: {
+    flex: 1,
+  },
+  paymentInfoLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  paymentInfoValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
   },
 });

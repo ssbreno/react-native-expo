@@ -22,6 +22,7 @@ import {
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { adminService, AdminUser } from '../../services/adminService';
+import { formatCurrency } from '../../utils/dateUtils';
 import { vehicleService } from '../../services/vehicleService';
 import { Vehicle } from '../../types';
 import { Colors } from '../../constants/colors';
@@ -63,9 +64,14 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   const loadUserDetails = async () => {
     setLoading(true);
     try {
-      const userResult = await adminService.getUserDetails(userId);
+      // Load user details and payment status in parallel
+      const [userResult, paymentStatusResult] = await Promise.all([
+        adminService.getUserDetails(userId),
+        adminService.getUsersWithPaymentStatus()
+      ]);
 
       console.log('👤 User details result:', JSON.stringify(userResult, null, 2));
+      console.log('💰 Payment status result:', JSON.stringify(paymentStatusResult, null, 2));
 
       if (userResult.success && userResult.data) {
         console.log('✅ Setting user data:', userResult.data);
@@ -76,12 +82,41 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
         console.log('💵 Monthly amount:', userResult.data.monthly_amount);
         console.log('🚗 Vehicles:', userResult.data.vehicles);
         
-        setUser(userResult.data);
+        let userData = userResult.data;
+        
+        // Merge payment status data - try multiple comparison methods
+        if (paymentStatusResult.success && paymentStatusResult.data) {
+          console.log('🔍 Searching for user ID:', userId, 'Type:', typeof userId);
+          console.log('📋 Available users:', paymentStatusResult.data.map((u: AdminUser) => ({ id: u.id, type: typeof u.id })));
+          
+          // Try multiple matching strategies
+          const paymentData = paymentStatusResult.data.find((u: AdminUser) => {
+            const match1 = u.id.toString() === userId.toString();
+            const match2 = u.id === parseInt(userId);
+            const match3 = u.id.toString() === userId;
+            
+            console.log(`Comparing user ${u.id} with ${userId}: match1=${match1}, match2=${match2}, match3=${match3}`);
+            
+            return match1 || match2 || match3;
+          });
+          
+          if (paymentData) {
+            console.log('✅ Found payment data:', paymentData);
+            userData = { ...userData, ...paymentData };
+            console.log('💳 Payment status merged:', userData.payment_status);
+          } else {
+            console.log('⚠️ No payment data found for user ID:', userId);
+            // Set default if no payment data found
+            userData.payment_status = 'no_payments';
+          }
+        }
+        
+        setUser(userData);
         
         // Set vehicles from user data if available
-        if (userResult.data.vehicles && Array.isArray(userResult.data.vehicles)) {
-          console.log('🚙 Setting vehicles from user data:', userResult.data.vehicles);
-          setUserVehicles(userResult.data.vehicles);
+        if (userData.vehicles && Array.isArray(userData.vehicles)) {
+          console.log('🚙 Setting vehicles from user data:', userData.vehicles);
+          setUserVehicles(userData.vehicles);
         } else {
           console.log('⚠️ No vehicles found in user data');
           setUserVehicles([]);
@@ -257,6 +292,33 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
     }
   };
 
+  const getPaymentStatusColor = (status?: string) => {
+    switch (status) {
+      case 'up_to_date': return { bg: '#E8F5E8', text: '#2E7D32', icon: '#4CAF50' };
+      case 'overdue': return { bg: '#FFEBEE', text: '#D32F2F', icon: '#F44336' };
+      case 'no_payments': return { bg: '#FFF3E0', text: '#F57C00', icon: '#FF9800' };
+      default: return { bg: '#F5F5F5', text: '#757575', icon: '#757575' };
+    }
+  };
+
+  const getPaymentStatusText = (status?: string) => {
+    switch (status) {
+      case 'up_to_date': return 'Em Dia';
+      case 'overdue': return 'Vencido';
+      case 'no_payments': return 'Sem Pagamentos';
+      default: return 'Indefinido';
+    }
+  };
+
+  const getPaymentStatusIcon = (status?: string) => {
+    switch (status) {
+      case 'up_to_date': return 'checkmark-circle';
+      case 'overdue': return 'alert-circle';
+      case 'no_payments': return 'information-circle';
+      default: return 'help-circle';
+    }
+  };
+
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'Não informado';
     return new Date(dateString).toLocaleDateString('pt-BR');
@@ -382,6 +444,63 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
               </Text>
             </View>
           )}
+        </Card.Content>
+      </Card>
+
+      {/* Payment Status */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title style={styles.sectionTitle}>Status do Pagamento Atual</Title>
+          <View style={[styles.paymentStatusContainer, { backgroundColor: getPaymentStatusColor(user.payment_status).bg }]}>
+            <View style={styles.paymentStatusHeader}>
+              <Ionicons 
+                name={getPaymentStatusIcon(user.payment_status) as any} 
+                size={32} 
+                color={getPaymentStatusColor(user.payment_status).icon} 
+              />
+              <View style={styles.paymentStatusInfo}>
+                <Text style={styles.paymentStatusLabel}>Status Atual</Text>
+                <Text style={[styles.paymentStatusValue, { color: getPaymentStatusColor(user.payment_status).text }]}>
+                  {getPaymentStatusText(user.payment_status)}
+                </Text>
+              </View>
+            </View>
+            
+            {user.payment_status === 'overdue' && (
+              <View style={styles.overdueDetails}>
+                <Divider style={{ marginVertical: 12, backgroundColor: '#FFCDD2' }} />
+                <View style={styles.overdueRow}>
+                  <View style={styles.overdueItem}>
+                    <Ionicons name="time-outline" size={20} color="#D32F2F" />
+                    <View>
+                      <Text style={styles.overdueLabel}>Dias em Atraso</Text>
+                      <Text style={styles.overdueValue}>{user.days_overdue || 0} dias</Text>
+                    </View>
+                  </View>
+                  <View style={styles.overdueItem}>
+                    <Ionicons name="cash-outline" size={20} color="#D32F2F" />
+                    <View>
+                      <Text style={styles.overdueLabel}>Valor Pendente</Text>
+                      <Text style={styles.overdueValue}>{formatCurrency(user.pending_amount || 0)}</Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+            )}
+            
+            {user.payment_status === 'up_to_date' && user.last_payment && (
+              <View style={styles.upToDateDetails}>
+                <Divider style={{ marginVertical: 12, backgroundColor: '#C8E6C9' }} />
+                <View style={styles.upToDateRow}>
+                  <Ionicons name="calendar-outline" size={20} color="#4CAF50" />
+                  <View>
+                    <Text style={styles.upToDateLabel}>Último Pagamento</Text>
+                    <Text style={styles.upToDateValue}>{formatDate(user.last_payment)}</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
         </Card.Content>
       </Card>
 
@@ -554,38 +673,6 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
         </Card.Content>
       </Card>
 
-      {/* Admin Actions */}
-      <Card style={styles.card}>
-        <Card.Content>
-          <Title style={styles.sectionTitle}>Ações Administrativas</Title>
-          <View style={styles.actionButtons}>
-            <Button
-              mode="contained"
-              onPress={() => updateUserStatus('active')}
-              disabled={updatingStatus || user.status === 'active'}
-              style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
-            >
-              Ativar Usuário
-            </Button>
-            <Button
-              mode="contained"
-              onPress={() => updateUserStatus('inactive')}
-              disabled={updatingStatus || user.status === 'inactive'}
-              style={[styles.actionButton, { backgroundColor: '#FF9800' }]}
-            >
-              Inativar Usuário
-            </Button>
-            <Button
-              mode="contained"
-              onPress={() => updateUserStatus('suspended')}
-              disabled={updatingStatus || user.status === 'suspended'}
-              style={[styles.actionButton, { backgroundColor: '#F44336' }]}
-            >
-              Suspender Usuário
-            </Button>
-          </View>
-        </Card.Content>
-      </Card>
 
       {/* Edit Payment Dialog */}
       <Portal>
@@ -870,5 +957,70 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#333',
     fontWeight: '400',
+  },
+  paymentStatusContainer: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  paymentStatusHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  paymentStatusInfo: {
+    flex: 1,
+  },
+  paymentStatusLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  paymentStatusValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  overdueDetails: {
+    marginTop: 8,
+  },
+  overdueRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  overdueItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  overdueLabel: {
+    fontSize: 12,
+    color: '#D32F2F',
+    marginBottom: 4,
+  },
+  overdueValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#D32F2F',
+  },
+  upToDateDetails: {
+    marginTop: 8,
+  },
+  upToDateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  upToDateLabel: {
+    fontSize: 12,
+    color: '#4CAF50',
+    marginBottom: 4,
+  },
+  upToDateValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
   },
 });

@@ -4,7 +4,8 @@ import {
   StyleSheet,
   Alert,
   Clipboard,
-  Dimensions
+  Dimensions,
+  ScrollView
 } from 'react-native';
 import {
   Modal,
@@ -142,7 +143,7 @@ export default function PixPaymentModal({
           setRetryCount(prev => prev + 1);
           const backoffInterval = Math.min(30000, 5000 * Math.pow(1.5, retryCount));
           setPollingInterval(backoffInterval);
-          console.warn('Erro temporário ao verificar pagamento:', result.error);
+          // Silently retry - errors are expected during polling
         }
       } catch (error: any) {
         // Handle network connectivity issues with exponential backoff
@@ -150,7 +151,7 @@ export default function PixPaymentModal({
         const backoffInterval = Math.min(30000, 5000 * Math.pow(1.5, retryCount));
         setPollingInterval(backoffInterval);
         
-        console.error('Erro de conectividade ao verificar pagamento:', error);
+        // Silently handle connectivity issues during polling
         
         // Only stop polling if payment has expired
         if (timeLeft <= 0) {
@@ -239,7 +240,7 @@ export default function PixPaymentModal({
               }
             }
           } catch (error) {
-            console.error('Polling error:', error);
+            // Silently handle polling errors
           } finally {
             setCheckingPayment(false);
           }
@@ -285,167 +286,156 @@ export default function PixPaymentModal({
   return (
     <Portal>
       <Modal visible={visible} onDismiss={onDismiss} contentContainerStyle={styles.modalContainer}>
-        <Card style={styles.card}>
-          <Card.Content>
+        <View style={styles.modalContent}>
+          <ScrollView showsVerticalScrollIndicator={false}>
             {/* Header */}
             <View style={styles.header}>
-              <Ionicons name="logo-bitcoin" size={32} color={theme.colors.primary} />
-              <Title style={styles.title}>Pagamento PIX</Title>
+              <View style={styles.headerIconContainer}>
+                <Ionicons name="wallet-outline" size={28} color="#4169E1" />
+              </View>
+              <View style={styles.headerTextContainer}>
+                <Title style={styles.title}>Pagamento PIX</Title>
+                <Text style={styles.subtitle}>Pague de forma rápida e segura</Text>
+              </View>
             </View>
 
-            {/* Payment Info */}
-            <Surface style={styles.paymentInfo}>
-              {/* Verificar se há juros aplicados */}
-              {paymentData.amount > paymentData.base_amount ? (
-                <>
-                  <Text style={styles.amountLabel}>Valor Original:</Text>
-                  <Text style={[styles.baseAmount, { color: '#666' }]}>
-                    {formatCurrency(paymentData.base_amount)}
-                  </Text>
-                  
-                  <Text style={styles.interestLabel}>+ Juros de Atraso:</Text>
-                  <Text style={[styles.interestAmount, { color: Colors.error }]}>
-                    {formatCurrency(paymentData.amount - paymentData.base_amount)}
-                  </Text>
-                  
-                  <View style={styles.totalDivider} />
-                  
-                  <Text style={styles.totalLabel}>Total a Pagar:</Text>
-                  <Text style={[styles.amount, { color: theme.colors.primary }]}>
-                    {formatCurrency(paymentData.amount)}
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <Text style={styles.amountLabel}>Valor a pagar:</Text>
-                  <Text style={[styles.amount, { color: theme.colors.primary }]}>
-                    {formatCurrency(paymentData.amount)}
-                  </Text>
-                </>
+            {/* Payment Amount Card */}
+            <Surface style={styles.amountCard}>
+              <Text style={styles.amountLabel}>Valor a pagar</Text>
+              <Text style={styles.amount}>{formatCurrency(paymentData.amount)}</Text>
+              {paymentData.amount > paymentData.base_amount && (
+                <Text style={styles.interestNote}>
+                  Inclui juros de {formatCurrency(paymentData.amount - paymentData.base_amount)}
+                </Text>
               )}
             </Surface>
 
-            {/* Payment Status */}
-            <Surface style={[
-              styles.statusContainer,
+            {/* Payment Status Badge */}
+            <View style={[
+              styles.statusBadge,
               { backgroundColor: 
-                paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#e8f5e8' :
-                paymentStatus === 'pending' ? '#fff3cd' : '#ffebee'
+                paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#E8F5E9' :
+                paymentStatus === 'pending' ? '#FFF9E6' : '#FFEBEE'
               }
             ]}>
-              <View style={styles.statusRow}>
-                <Ionicons 
-                  name={
-                    paymentStatus === 'paid' || paymentStatus === 'confirmed' ? 'checkmark-circle' :
-                    paymentStatus === 'pending' ? 'time-outline' : 'alert-circle'
-                  } 
-                  size={20} 
-                  color={
-                    paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#4caf50' :
-                    paymentStatus === 'pending' ? '#ff9800' : '#f44336'
-                  } 
-                />
-                <Text style={[styles.statusText, {
-                  color: 
-                    paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#4caf50' :
-                    paymentStatus === 'pending' ? '#ff9800' : '#f44336'
-                }]}>
-                  {paymentStatus === 'paid' || paymentStatus === 'confirmed' ? 'Pagamento Confirmado' :
-                   paymentStatus === 'pending' ? 'Aguardando Pagamento' : 'Status Desconhecido'}
-                </Text>
-                {checkingPayment && <ActivityIndicator size="small" color="#666" />}
+              <Ionicons 
+                name={
+                  paymentStatus === 'paid' || paymentStatus === 'confirmed' ? 'checkmark-circle' :
+                  paymentStatus === 'pending' ? 'time-outline' : 'alert-circle'
+                } 
+                size={18} 
+                color={
+                  paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#4CAF50' :
+                  paymentStatus === 'pending' ? '#FFA726' : '#EF5350'
+                } 
+              />
+              <Text style={[
+                styles.statusText,
+                { color: paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#2E7D32' :
+                  paymentStatus === 'pending' ? '#F57C00' : '#C62828'
+                }
+              ]}>
+                {paymentStatus === 'paid' || paymentStatus === 'confirmed' ? 'Pagamento Confirmado' :
+                 paymentStatus === 'pending' ? 'Aguardando Pagamento' : 'Verificando...'}
+              </Text>
+              {checkingPayment && <ActivityIndicator size="small" color="#666" style={{ marginLeft: 8 }} />}
+            </View>
+
+            {/* Timer Badge */}
+            {timeLeft > 0 && paymentStatus !== 'paid' && paymentStatus !== 'confirmed' && (
+              <View style={styles.timerBadge}>
+                <Ionicons name="hourglass-outline" size={16} color="#FF6B6B" />
+                <Text style={styles.timerText}>Expira em {formatTime(timeLeft)}</Text>
+              </View>
+            )}
+
+            {/* QR Code Card */}
+            <Surface style={styles.qrCard}>
+              <Text style={styles.sectionTitle}>Escaneie o QR Code</Text>
+              <View style={styles.qrWrapper}>
+                {paymentData.pix_qr_code && paymentData.pix_qr_code.length <= 4296 ? (
+                  <View style={styles.qrCodeContainer}>
+                    <QRCode
+                      value={paymentData.pix_qr_code}
+                      size={180}
+                      backgroundColor="white"
+                      color="#1a1a1a"
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.qrPlaceholder}>
+                    <Ionicons name="qr-code-outline" size={64} color="#BDBDBD" />
+                    <Text style={styles.qrPlaceholderText}>
+                      {paymentData.pix_qr_code ? 'Use o código abaixo' : 'QR Code indisponível'}
+                    </Text>
+                  </View>
+                )}
               </View>
             </Surface>
 
-            {/* Timer */}
-            {timeLeft > 0 && paymentStatus !== 'paid' && paymentStatus !== 'confirmed' && (
-              <Surface style={styles.timerContainer}>
-                <Ionicons name="time-outline" size={20} color="#f44336" />
-                <Text style={styles.timerText}>
-                  Expira em: {formatTime(timeLeft)}
+            {/* PIX Copy/Paste Card */}
+            <Surface style={styles.pixCodeCard}>
+              <View style={styles.pixCodeHeader}>
+                <Ionicons name="copy-outline" size={20} color="#666" />
+                <Text style={styles.sectionTitle}>Código PIX Copia e Cola</Text>
+              </View>
+              <View style={styles.pixCodeBox}>
+                <Text style={styles.pixCode} numberOfLines={3} ellipsizeMode="middle">
+                  {paymentData.pix_copy_paste || 'Código não disponível'}
                 </Text>
-              </Surface>
-            )}
-
-            <Divider style={styles.divider} />
-
-            {/* QR Code */}
-            <View style={styles.qrContainer}>
-              <Text style={styles.qrLabel}>Escaneie o QR Code:</Text>
-              <Surface style={styles.qrCodeSurface}>
-                {paymentData.pix_qr_code ? (
-                  <QRCode
-                    value={paymentData.pix_qr_code}
-                    size={200}
-                    backgroundColor="white"
-                    color="black"
-                  />
-                ) : (
-                  <View style={styles.qrPlaceholder}>
-                    <Ionicons name="qr-code-outline" size={60} color="#ccc" />
-                    <Text style={styles.qrPlaceholderText}>QR Code não disponível</Text>
-                  </View>
-                )}
-              </Surface>
-            </View>
-
-            <Divider style={styles.divider} />
-
-            {/* PIX Code */}
-            <View style={styles.pixCodeContainer}>
-              <Text style={styles.pixCodeLabel}>Ou copie o código PIX:</Text>
-              <Surface style={styles.pixCodeSurface}>
-                <Text style={styles.pixCode} numberOfLines={3}>
-                  {paymentData.pix_copy_paste || 'Código PIX não disponível'}
-                </Text>
-              </Surface>
-              
+              </View>
               <Button
-                mode="outlined"
+                mode="contained"
                 onPress={copyPixCode}
                 style={styles.copyButton}
-                icon="content-copy"
+                labelStyle={styles.copyButtonLabel}
                 disabled={!paymentData.pix_copy_paste}
               >
-                Copiar Código PIX
+                Copiar Código
               </Button>
-            </View>
+            </Surface>
 
-            <Divider style={styles.divider} />
+            {/* Instructions Card */}
+            <Surface style={styles.instructionsCard}>
+              <View style={styles.instructionRow}>
+                <View style={styles.stepBadge}><Text style={styles.stepNumber}>1</Text></View>
+                <Text style={styles.instructionText}>Abra o app do seu banco</Text>
+              </View>
+              <View style={styles.instructionRow}>
+                <View style={styles.stepBadge}><Text style={styles.stepNumber}>2</Text></View>
+                <Text style={styles.instructionText}>Escolha pagar com PIX</Text>
+              </View>
+              <View style={styles.instructionRow}>
+                <View style={styles.stepBadge}><Text style={styles.stepNumber}>3</Text></View>
+                <Text style={styles.instructionText}>Escaneie ou cole o código</Text>
+              </View>
+              <View style={styles.instructionRow}>
+                <View style={styles.stepBadge}><Text style={styles.stepNumber}>4</Text></View>
+                <Text style={styles.instructionText}>Confirme o pagamento</Text>
+              </View>
+            </Surface>
 
             {/* Action Buttons */}
             <View style={styles.actionButtons}>
               <Button
                 mode="contained"
                 onPress={handlePaymentConfirmed}
-                style={[styles.actionButton, { backgroundColor: Colors.success }]}
-                icon="check-circle"
+                style={styles.confirmButton}
+                labelStyle={styles.confirmButtonLabel}
               >
                 Já Paguei
               </Button>
-              
               <Button
-                mode="outlined"
+                mode="text"
                 onPress={onDismiss}
-                style={styles.actionButton}
-                icon="close"
+                style={styles.cancelButton}
+                labelStyle={styles.cancelButtonLabel}
               >
-                Cancelar
+                Fechar
               </Button>
             </View>
-
-            {/* Instructions */}
-            <Surface style={styles.instructionsContainer}>
-              <Text style={styles.instructionsTitle}>Como pagar:</Text>
-              <Text style={styles.instructionText}>
-                1. Abra o app do seu banco{'\n'}
-                2. Escaneie o QR Code ou cole o código PIX{'\n'}
-                3. Confirme o pagamento{'\n'}
-                4. Clique em "Já Paguei" após efetuar o pagamento
-              </Text>
-            </Surface>
-          </Card.Content>
-        </Card>
+          </ScrollView>
+        </View>
       </Modal>
     </Portal>
   );
@@ -453,168 +443,246 @@ export default function PixPaymentModal({
 
 const styles = StyleSheet.create({
   modalContainer: {
-    padding: 20,
-    justifyContent: 'center',
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  card: {
-    maxHeight: '90%',
+  modalContent: {
+    backgroundColor: '#F8F9FA',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '92%',
+    paddingTop: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
+  },
+  headerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   title: {
-    marginLeft: 12,
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    marginBottom: 2,
   },
-  paymentInfo: {
-    padding: 16,
-    borderRadius: 8,
+  subtitle: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '400',
+  },
+  amountCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
     marginBottom: 16,
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
   amountLabel: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 13,
+    color: '#757575',
     marginBottom: 4,
+    fontWeight: '500',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   amount: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#4169E1',
+    marginBottom: 4,
   },
-  timerContainer: {
+  interestNote: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    marginTop: 4,
+  },
+  statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#ffebee',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  statusText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  timerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFE5E5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    alignSelf: 'center',
     marginBottom: 16,
   },
   timerText: {
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#f44336',
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FF6B6B',
   },
-  divider: {
-    marginVertical: 16,
-  },
-  qrContainer: {
-    alignItems: 'center',
-  },
-  qrLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  qrCodeSurface: {
-    padding: 20,
-    borderRadius: 12,
-    elevation: 2,
+  qrCard: {
     backgroundColor: 'white',
-  },
-  qrPlaceholder: {
-    width: 200,
-    height: 200,
-    justifyContent: 'center',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
   },
-  qrPlaceholderText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#ccc',
-    textAlign: 'center',
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginLeft: 8,
   },
-  pixCodeContainer: {
-    alignItems: 'center',
-  },
-  pixCodeLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  pixCodeSurface: {
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    width: '100%',
-  },
-  pixCode: {
-    fontSize: 12,
-    fontFamily: 'monospace',
-    textAlign: 'center',
-    color: '#333',
-  },
-  copyButton: {
-    marginBottom: 8,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  actionButton: {
-    flex: 1,
-  },
-  instructionsContainer: {
-    padding: 16,
-    borderRadius: 8,
+  qrWrapper: {
     marginTop: 16,
   },
-  instructionsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  qrCodeContainer: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  qrPlaceholder: {
+    width: 180,
+    height: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+  },
+  qrPlaceholderText: {
+    marginTop: 12,
+    fontSize: 13,
+    color: '#9E9E9E',
+    textAlign: 'center',
+  },
+  pixCodeCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  pixCodeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  pixCodeBox: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  pixCode: {
+    fontSize: 11,
+    fontFamily: 'monospace',
+    color: '#424242',
+    lineHeight: 16,
+  },
+  copyButton: {
+    borderRadius: 10,
+    backgroundColor: '#4169E1',
+  },
+  copyButtonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    paddingVertical: 4,
+  },
+  instructionsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  instructionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  stepBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  stepNumber: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#4169E1',
   },
   instructionText: {
     fontSize: 14,
-    lineHeight: 20,
-    color: '#666',
+    color: '#424242',
+    flex: 1,
   },
-  statusContainer: {
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+  actionButtons: {
+    gap: 12,
+    marginBottom: 8,
   },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+  confirmButton: {
+    borderRadius: 12,
+    backgroundColor: '#4CAF50',
+    elevation: 0,
   },
-  statusText: {
+  confirmButtonLabel: {
     fontSize: 16,
+    fontWeight: '600',
+    paddingVertical: 8,
+  },
+  cancelButton: {
+    borderRadius: 12,
+  },
+  cancelButtonLabel: {
+    fontSize: 15,
     fontWeight: '500',
-  },
-  baseAmount: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  interestLabel: {
-    fontSize: 14,
-    color: Colors.error,
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  interestAmount: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  totalDivider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 12,
-  },
-  totalLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    color: '#757575',
   },
 });

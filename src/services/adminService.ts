@@ -163,12 +163,26 @@ export const adminService = {
 
   async getUserDetails(userId: string): Promise<ApiResponse<AdminUser>> {
     try {
+      // Try to fetch from payment status endpoint first
       const response = await api.get(`/admin/users/${userId}`);
       console.log('📡 API Response for user details:', JSON.stringify(response.data, null, 2));
       
       // Handle different response formats
-      const userData = response.data.user || response.data;
+      let userData = response.data.user || response.data;
       console.log('📦 Processed user data:', JSON.stringify(userData, null, 2));
+      
+      // Try to get payment status from dedicated endpoint
+      try {
+        const paymentResponse = await api.get(`/admin/users/${userId}/payment-status`);
+        console.log('💰 Payment status response:', JSON.stringify(paymentResponse.data, null, 2));
+        
+        if (paymentResponse.data) {
+          userData = { ...userData, ...paymentResponse.data };
+          console.log('✅ Merged payment status:', userData.payment_status);
+        }
+      } catch (paymentError) {
+        console.log('⚠️ Could not fetch payment status from dedicated endpoint, will try alternative method');
+      }
       
       return { success: true, data: userData };
     } catch (error: any) {
