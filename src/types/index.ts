@@ -85,6 +85,21 @@ export interface Vehicle {
   features?: string[];
 }
 
+export interface VehicleCreateData {
+  vehicle_type: 'car' | 'moto';
+  brand: string;
+  model: string;
+  manufacture_year: number;
+  model_year: number;
+  color: string;
+  license_plate: string;
+  chassis: string;
+  mileage?: number;
+  fuel_type: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid';
+  price: number;
+  description?: string;
+}
+
 export interface VehicleUpdateData {
   brand: string;
   chassis: string;
@@ -97,6 +112,10 @@ export interface VehicleUpdateData {
   model_year: number;
   price: number;
   status: 'ativo' | 'inativo' | 'available' | 'rented' | 'maintenance';
+}
+
+export interface AssignVehicleData {
+  user_id: number;
 }
 
 // Payment Types
