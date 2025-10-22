@@ -57,13 +57,7 @@
       "package": "com.nanquim.locacoes",
       "versionCode": 7,
       "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE"],
-      "useNextNotificationsApi": true,
-      "jsEngine": "hermes",
-      "enableProguardInReleaseBuilds": true,
-      "enableShrinkResourcesInReleaseBuilds": true,
-      "config": {
-        "usesCleartextTraffic": false
-      }
+      "jsEngine": "hermes"
     },
     "web": {
       "favicon": "./assets/favicon.png"
