@@ -1,16 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, AuthContextType, AuthResponse } from '../types';
 import { authService } from '../services/authService';
-
-const deleteStorageItem = async (key: string): Promise<void> => {
-  if (Platform.OS === 'web') {
-    localStorage.removeItem(key);
-  } else {
-    await SecureStore.deleteItemAsync(key);
-  }
-};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -39,11 +30,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const token = await authService.getStoredToken();
       const userData = await authService.getStoredUser();
-      
+
       if (token && userData) {
         setUser(userData);
         setIsAuthenticated(true);
-        
+
         // Validate token with server
         const profileResult = await authService.getCurrentUser();
         if (profileResult.success && profileResult.data) {
@@ -63,30 +54,33 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
       const result = await authService.login(email, password);
-      
+
       if (result.success && result.user && result.token) {
         // Auth data is already stored by authService
         const userWithAdminCheck = {
           ...result.user,
-          is_admin: result.user.is_admin || result.user.email === 'admin@vehicles.com' || result.user.email.toLowerCase().includes('admin')
+          is_admin:
+            result.user.is_admin ||
+            result.user.email === 'admin@vehicles.com' ||
+            result.user.email.toLowerCase().includes('admin'),
         };
-        
+
         console.log('🔐 AuthContext - Login Success:', {
           email: userWithAdminCheck.email,
           is_admin: userWithAdminCheck.is_admin,
-          original_is_admin: result.user.is_admin
+          original_is_admin: result.user.is_admin,
         });
-        
+
         setUser(userWithAdminCheck);
         setIsAuthenticated(true);
       }
-      
+
       return result;
     } catch (error) {
       console.error('🔐 Erro no login:', error);
       return {
         success: false,
-        error: 'Erro interno do servidor'
+        error: 'Erro interno do servidor',
       };
     } finally {
       setLoading(false);
@@ -96,13 +90,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const logout = async (): Promise<void> => {
     try {
       setLoading(true);
-      
+
       // Call logout service
       await authService.logout();
-      
+
       // Clear stored data
       await clearAuthData();
-      
+
       setUser(null);
       setIsAuthenticated(false);
     } catch (error) {
@@ -118,9 +112,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const clearAuthData = async (): Promise<void> => {
     try {
-      await deleteStorageItem('authToken');
-      await deleteStorageItem('userData');
-      await deleteStorageItem('refresh_token');
+      await AsyncStorage.multiRemove(['auth_token', 'user_data', 'refresh_token']);
     } catch (error) {
       console.error('Erro ao limpar dados de autenticação:', error);
     }
@@ -129,7 +121,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // Monitor token changes and automatically logout if tokens are cleared by API interceptor
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    
+
     if (isAuthenticated) {
       interval = setInterval(async () => {
         const token = await authService.getStoredToken();
@@ -154,12 +146,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     loading,
     login,
-    logout
+    logout,
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

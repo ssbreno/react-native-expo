@@ -9,7 +9,7 @@ export interface User {
   password?: string;
   email: string;
   cpf: string;
-  phone: string;
+  phone?: string;
   birth_date: string;
   zip_code: string;
   is_admin: boolean;
@@ -61,17 +61,17 @@ export interface Vehicle {
   user_id: number;
   brand: string;
   model: string;
-  year: number;
-  manufacture_year: number;
-  model_year: number;
-  color: string;
+  year?: number;
+  manufacture_year?: number;
+  model_year?: number;
+  color?: string;
   license_plate: string;
-  chassis: string;
-  mileage: number;
-  fuel_type: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid' | 'flex';
+  chassis?: string;
+  mileage?: number;
+  fuel_type?: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid' | 'flex';
   price: number;
   status: 'ativo' | 'inativo' | 'available' | 'rented' | 'maintenance';
-  description: string;
+  description?: string;
   created_at: string;
   updated_at: string;
   user?: User;
@@ -90,17 +90,17 @@ export interface VehicleUpdateData {
   chassis: string;
   color: string;
   description: string;
-  fuel_type: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid';
+  fuel_type: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid' | 'flex';
   manufacture_year: number;
   mileage: number;
   model: string;
   model_year: number;
   price: number;
-  status: 'ativo' | 'inativo';
+  status: 'ativo' | 'inativo' | 'available' | 'rented' | 'maintenance';
 }
 
 // Payment Types
-export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'cancelled' | 'overdue';
+export type PaymentStatus = 'pending' | 'completed' | 'paid' | 'failed' | 'cancelled' | 'overdue';
 
 export interface Payment {
   id: number;
@@ -182,7 +182,6 @@ export interface Subscription {
   autoRenewal: boolean;
 }
 
-
 // API Response Types
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -201,6 +200,7 @@ export type RootStackParamList = {
   UpdateOverduePayments: undefined;
   VehicleDetail: { vehicleId: number };
   VehicleEdit: { vehicleId: number };
+  ChangePassword: undefined;
 };
 
 export type MainTabParamList = {

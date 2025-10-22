@@ -1,11 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  StyleSheet,
-  FlatList,
-  RefreshControl,
-  Alert
-} from 'react-native';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { View, FlatList, RefreshControl, Alert } from 'react-native';
 import {
   Card,
   Title,
@@ -15,7 +9,7 @@ import {
   Surface,
   Chip,
   useTheme,
-  Divider
+  Divider,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { useVehicle } from '../../contexts/VehicleContext';
@@ -24,6 +18,7 @@ import { formatCurrency, formatDateTime, getPaymentStatus } from '../../utils/da
 import { paymentService } from '../../services/paymentService';
 import PixPayment from '../../components/PixPayment';
 import PaymentReceipt from '../../components/PaymentReceipt';
+import { styles } from './PaymentHistoryScreen.styles';
 
 interface PaymentHistoryScreenProps {
   navigation: any;
@@ -42,16 +37,19 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
 
   const normalizeStatus = (status: string): string => {
     const statusMap: Record<string, string> = {
-      'pendente': 'pending',
-      'vencido': 'overdue', 
-      'pago': 'completed',
-      'completed': 'completed',
-      'pending': 'pending',
-      'overdue': 'overdue',
-      'failed': 'failed',
-      'cancelled': 'cancelled'
+      pendente: 'pending',
+      vencido: 'overdue',
+      pago: 'paid',
+      completed: 'completed',
+      paid: 'paid',
+      pending: 'pending',
+      overdue: 'overdue',
+      failed: 'failed',
+      cancelled: 'cancelled',
     };
-    return statusMap[status] || status;
+    const normalized = statusMap[status.toLowerCase()] || status;
+    console.log('🔄 Normalizing status:', { original: status, normalized });
+    return normalized;
   };
 
   const isPaymentPending = (status: string): boolean => {
@@ -61,48 +59,49 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
 
   const isPaymentCompleted = (status: string): boolean => {
     const normalizedStatus = normalizeStatus(status);
-    return normalizedStatus === 'completed';
+    const isCompleted = normalizedStatus === 'completed' || normalizedStatus === 'paid';
+    console.log('🔍 Checking if payment is completed:', { status, normalizedStatus, isCompleted });
+    return isCompleted;
   };
 
-  const handlePayment = (payment: Payment) => {
+  const handlePayment = useCallback((payment: Payment) => {
     Alert.alert(
       'Pagamento via PIX',
       `Deseja gerar PIX de ${formatCurrency(payment.amount)} para ${payment.vehicleName}?`,
       [
         { text: 'Cancelar', style: 'cancel' },
-        { text: 'Gerar PIX', onPress: () => setShowPixPayment(parseInt(payment.id.toString())) }
+        { text: 'Gerar PIX', onPress: () => setShowPixPayment(parseInt(payment.id.toString())) },
       ]
     );
-  };
+  }, []);
 
-  const handlePixPaymentComplete = (paymentData: any) => {
-    Alert.alert(
-      'Pagamento Concluído!',
-      'Seu pagamento PIX foi processado com sucesso.',
-      [{ text: 'OK', onPress: () => {
-        setShowPixPayment(null);
-        refreshData();
-      }}]
-    );
-  };
+  const handlePixPaymentComplete = useCallback(
+    (paymentData: any) => {
+      Alert.alert('Pagamento Concluído!', 'Seu pagamento PIX foi processado com sucesso.', [
+        {
+          text: 'OK',
+          onPress: () => {
+            setShowPixPayment(null);
+            refreshData();
+          },
+        },
+      ]);
+    },
+    [refreshData]
+  );
 
   const processPaymentWithMethod = async (paymentId: string, method: PaymentMethod) => {
     setProcessingPayment(paymentId);
-    
+
     try {
       const result = await processPayment(parseInt(paymentId), method);
-      
+
       if (result.success) {
-        Alert.alert(
-          'Sucesso!',
-          result.message || 'Pagamento processado com sucesso!',
-          [{ text: 'OK', onPress: () => refreshData() }]
-        );
+        Alert.alert('Sucesso!', result.message || 'Pagamento processado com sucesso!', [
+          { text: 'OK', onPress: () => refreshData() },
+        ]);
       } else {
-        Alert.alert(
-          'Erro',
-          result.error || 'Falha ao processar pagamento. Tente novamente.'
-        );
+        Alert.alert('Erro', result.error || 'Falha ao processar pagamento. Tente novamente.');
       }
     } catch (error) {
       Alert.alert('Erro', 'Erro interno. Tente novamente.');
@@ -112,7 +111,10 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
   };
 
   const renderPaymentCard = ({ item }: { item: Payment }) => {
-    const status = getPaymentStatus({ ...item, dueDate: item.dueDate || item.due_date || new Date().toISOString() });
+    const status = getPaymentStatus({
+      ...item,
+      dueDate: item.dueDate || item.due_date || new Date().toISOString(),
+    });
     const isProcessing = processingPayment === item.id.toString();
 
     return (
@@ -124,11 +126,9 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
               <Title style={styles.vehicleName} numberOfLines={1}>
                 {item.vehicleName}
               </Title>
-              <Text style={styles.description}>
-                {item.description || 'Mensalidade'}
-              </Text>
+              <Text style={styles.description}>{item.description || 'Mensalidade'}</Text>
             </View>
-            
+
             <View style={styles.amountContainer}>
               {/* Verificar se há juros aplicados */}
               {item.amount > (item.base_amount || item.amount) ? (
@@ -163,17 +163,15 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
               </Text>
             </View>
 
-            {item.date && (
+            {!!item.date && (
               <View style={styles.detailRow}>
                 <Ionicons name="checkmark-circle" size={16} color="#4caf50" />
                 <Text style={styles.detailLabel}>Pago em:</Text>
-                <Text style={styles.detailValue}>
-                  {formatDateTime(item.date)}
-                </Text>
+                <Text style={styles.detailValue}>{formatDateTime(item.date)}</Text>
               </View>
             )}
 
-            {item.method && (
+            {!!item.method && (
               <View style={styles.detailRow}>
                 <Ionicons name="card-outline" size={16} color="#666" />
                 <Text style={styles.detailLabel}>Método:</Text>
@@ -184,21 +182,14 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
 
           {/* Status Chip */}
           <View style={styles.statusContainer}>
-            <Surface
-              style={[
-                styles.statusChip,
-                { backgroundColor: status.backgroundColor }
-              ]}
-            >
-              <Ionicons 
-                name={status.icon} 
-                size={16} 
-                color={status.color} 
+            <Surface style={[styles.statusChip, { backgroundColor: status.backgroundColor }]}>
+              <Ionicons
+                name={status.icon}
+                size={16}
+                color={status.color}
                 style={styles.statusIcon}
               />
-              <Text style={[styles.statusText, { color: status.color }]}>
-                {status.text}
-              </Text>
+              <Text style={[styles.statusText, { color: status.color }]}>{status.text}</Text>
             </Surface>
           </View>
 
@@ -208,11 +199,14 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
             {isPaymentCompleted(item.status) && (
               <Button
                 mode="outlined"
-                onPress={() => setShowReceipt(parseInt(item.id.toString()))}
+                onPress={() => {
+                  console.log('📄 Opening receipt for payment ID:', item.id);
+                  setShowReceipt(parseInt(item.id.toString()));
+                }}
                 style={styles.receiptButton}
                 icon="receipt"
               >
-                Comprovante
+                <Text>Comprovante</Text>
               </Button>
             )}
 
@@ -223,7 +217,10 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
                 onPress={() => handlePayment(item)}
                 style={[
                   styles.payButton,
-                  { backgroundColor: normalizeStatus(item.status) === 'overdue' ? '#f44336' : theme.colors.primary }
+                  {
+                    backgroundColor:
+                      normalizeStatus(item.status) === 'overdue' ? '#f44336' : theme.colors.primary,
+                  },
                 ]}
                 disabled={isProcessing}
                 contentStyle={styles.payButtonContent}
@@ -231,7 +228,7 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
                 {isProcessing ? (
                   <ActivityIndicator color="white" />
                 ) : (
-                  `Pagar ${formatCurrency(item.amount)}`
+                  <Text>{`Pagar ${formatCurrency(item.amount)}`}</Text>
                 )}
               </Button>
             )}
@@ -242,7 +239,7 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
             <View>
               {showPixPayment === parseInt(item.id.toString()) && (
                 <View style={styles.pixPaymentContainer}>
-                  <PixPayment 
+                  <PixPayment
                     paymentId={parseInt(item.id.toString())}
                     amount={item.amount}
                     description={`Pagamento - ${item.vehicleName || 'Veículo'}`}
@@ -253,7 +250,7 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
                     onPress={() => setShowPixPayment(null)}
                     style={styles.cancelPixButton}
                   >
-                    Cancelar PIX
+                    <Text>Cancelar PIX</Text>
                   </Button>
                 </View>
               )}
@@ -270,24 +267,44 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
     <View style={styles.emptyContainer}>
       <Ionicons name="receipt-outline" size={64} color="#ccc" />
       <Title style={styles.emptyTitle}>Nenhum pagamento encontrado</Title>
-      <Text style={styles.emptyText}>
-        Seu histórico de pagamentos aparecerá aqui.
-      </Text>
-      <Button
-        mode="contained"
-        onPress={refreshData}
-        style={styles.retryButton}
-      >
-        Atualizar
+      <Text style={styles.emptyText}>Seu histórico de pagamentos aparecerá aqui.</Text>
+      <Button mode="contained" onPress={refreshData} style={styles.retryButton}>
+        <Text>Atualizar</Text>
       </Button>
     </View>
   );
 
-  // Calculate summary
-  const paidPayments = paymentHistory.filter(p => isPaymentCompleted(p.status));
-  const pendingPayments = paymentHistory.filter(p => isPaymentPending(p.status));
-  const totalPaid = paidPayments.reduce((sum, p) => sum + p.amount, 0);
-  const totalPending = pendingPayments.reduce((sum, p) => sum + p.amount, 0);
+  // Calculate summary with memoization
+  const paidPayments = useMemo(
+    () => paymentHistory.filter(p => isPaymentCompleted(p.status)),
+    [paymentHistory]
+  );
+
+  const pendingPayments = useMemo(
+    () => paymentHistory.filter(p => isPaymentPending(p.status)),
+    [paymentHistory]
+  );
+
+  const totalPaid = useMemo(
+    () => paidPayments.reduce((sum, p) => sum + p.amount, 0),
+    [paidPayments]
+  );
+
+  const totalPending = useMemo(
+    () => pendingPayments.reduce((sum, p) => sum + p.amount, 0),
+    [pendingPayments]
+  );
+
+  // Memoize sorted payment history
+  const sortedPayments = useMemo(
+    () =>
+      [...paymentHistory].sort(
+        (a, b) =>
+          new Date(b.dueDate || b.due_date || '').getTime() -
+          new Date(a.dueDate || a.due_date || '').getTime()
+      ),
+    [paymentHistory]
+  );
 
   if (loading && paymentHistory.length === 0) {
     return (
@@ -303,7 +320,7 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
       {/* Header with Summary */}
       <Surface style={styles.header}>
         <Title style={styles.headerTitle}>Histórico de Pagamentos</Title>
-        
+
         <View style={styles.summaryContainer}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Total Pago</Text>
@@ -311,9 +328,9 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
               {formatCurrency(totalPaid)}
             </Text>
           </View>
-          
+
           <View style={styles.summaryDivider} />
-          
+
           <View style={styles.summaryItem}>
             <Text style={styles.summaryLabel}>Pendente</Text>
             <Text style={[styles.summaryValue, { color: '#ff9800' }]}>
@@ -325,14 +342,12 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
 
       {/* Payment List */}
       <FlatList
-        data={paymentHistory.sort((a, b) => 
-          new Date(b.dueDate || b.due_date || '').getTime() - new Date(a.dueDate || a.due_date || '').getTime()
-        )}
+        data={sortedPayments}
         renderItem={renderPaymentCard}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={item => item.id.toString()}
         contentContainerStyle={[
           styles.listContainer,
-          paymentHistory.length === 0 && styles.emptyListContainer
+          paymentHistory.length === 0 && styles.emptyListContainer,
         ]}
         refreshControl={
           <RefreshControl
@@ -343,205 +358,28 @@ export default function PaymentHistoryScreen({ navigation }: PaymentHistoryScree
         }
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
+        // Performance optimizations
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={5}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={5}
+        windowSize={5}
+        getItemLayout={(data, index) => ({
+          length: 300, // Approximate card height
+          offset: 300 * index,
+          index,
+        })}
       />
-      
+
       {/* Payment Receipt Modal */}
-      {showReceipt && (
-        <PaymentReceipt
-          visible={!!showReceipt}
-          onDismiss={() => setShowReceipt(null)}
-          paymentId={showReceipt}
-        />
-      )}
+      <PaymentReceipt
+        visible={showReceipt !== null}
+        onDismiss={() => {
+          console.log('🔒 Closing receipt modal');
+          setShowReceipt(null);
+        }}
+        paymentId={showReceipt || 0}
+      />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    padding: 20,
-    elevation: 2,
-    backgroundColor: 'white',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  summaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  summaryItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  summaryDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#e0e0e0',
-  },
-  listContainer: {
-    padding: 16,
-  },
-  emptyListContainer: {
-    flexGrow: 1,
-  },
-  card: {
-    marginBottom: 16,
-    elevation: 4,
-    backgroundColor: 'white',
-  },
-  paymentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  paymentInfo: {
-    flex: 1,
-    marginRight: 16,
-  },
-  vehicleName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  description: {
-    fontSize: 14,
-    color: '#666',
-  },
-  amountContainer: {
-    alignItems: 'flex-end',
-  },
-  amount: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  divider: {
-    marginVertical: 12,
-  },
-  paymentDetails: {
-    marginBottom: 12,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    marginRight: 8,
-    minWidth: 80,
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    flex: 1,
-  },
-  statusContainer: {
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  statusChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    elevation: 1,
-  },
-  statusIcon: {
-    marginRight: 6,
-  },
-  statusText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  payButton: {
-    marginTop: 8,
-  },
-  payButtonContent: {
-    paddingVertical: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  retryButton: {
-    paddingHorizontal: 24,
-  },
-  pixPaymentContainer: {
-    marginTop: 12,
-    padding: 16,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  cancelPixButton: {
-    marginTop: 8,
-  },
-  actionButtonsContainer: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 12,
-  },
-  receiptButton: {
-    flex: 1,
-  },
-  amountBreakdown: {
-    alignItems: 'flex-end',
-  },
-  baseAmountSmall: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-  },
-  interestAmountSmall: {
-    fontSize: 12,
-    color: '#f44336',
-    fontWeight: '500',
-  },
-});

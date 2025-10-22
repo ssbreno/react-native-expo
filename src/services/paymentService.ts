@@ -34,7 +34,7 @@ export const paymentService = {
     try {
       console.log(`[PaymentService] Generating PIX QR code for payment ${paymentId}`);
       const response = await api.post('/pix/generate', {
-        payment_id: paymentId
+        payment_id: paymentId,
       });
 
       return {
@@ -54,13 +54,16 @@ export const paymentService = {
           is_recurring: true,
           next_payment_date: undefined,
           created_at: response.data.created_at,
-          expires_at: response.data.expires_at
-        }
+          expires_at: response.data.expires_at,
+        },
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.message || error.response?.data?.error || 'Erro ao gerar QR code PIX'
+        error:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Erro ao gerar QR code PIX',
       };
     }
   },
@@ -87,13 +90,16 @@ export const paymentService = {
           is_recurring: true,
           next_payment_date: undefined,
           created_at: response.data.created_at,
-          expires_at: response.data.expires_at
-        }
+          expires_at: response.data.expires_at,
+        },
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.message || error.response?.data?.error || 'Erro ao obter QR code PIX'
+        error:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Erro ao obter QR code PIX',
       };
     }
   },
@@ -120,13 +126,16 @@ export const paymentService = {
           is_recurring: true,
           next_payment_date: undefined,
           created_at: response.data.created_at,
-          expires_at: response.data.updated_at
-        }
+          expires_at: response.data.updated_at,
+        },
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.message || error.response?.data?.error || 'Erro ao verificar status do pagamento'
+        error:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Erro ao verificar status do pagamento',
       };
     }
   },
@@ -138,12 +147,15 @@ export const paymentService = {
 
       return {
         success: true,
-        message: response.data.message || 'Pagamento cancelado com sucesso'
+        message: response.data.message || 'Pagamento cancelado com sucesso',
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.message || error.response?.data?.error || 'Erro ao cancelar pagamento'
+        error:
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          'Erro ao cancelar pagamento',
       };
     }
   },
@@ -152,15 +164,15 @@ export const paymentService = {
     try {
       const url = paymentId ? `/payments/${paymentId}/history` : '/payments/history';
       const response = await api.get(url);
-      
+
       return {
         success: true,
-        data: response.data.history || response.data
+        data: response.data.history || response.data,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao obter histórico de pagamentos'
+        error: error.response?.data?.error || 'Erro ao obter histórico de pagamentos',
       };
     }
   },
@@ -169,7 +181,7 @@ export const paymentService = {
     try {
       const params = new URLSearchParams(filters);
       const response = await api.get(`/payments?${params}`);
-      
+
       // Ensure proper mapping of payment data with due dates
       const payments = (response.data.payments || response.data || []).map((payment: any) => ({
         id: payment.id || payment.payment_id,
@@ -177,21 +189,25 @@ export const paymentService = {
         vehicleName: payment.vehicle_name || payment.vehicleName || 'Veículo',
         amount: payment.amount || 0,
         date: payment.paid_at || payment.date,
-        status: payment.status === 'completed' ? 'completed' : 
-                payment.status === 'overdue' ? 'overdue' : 'pending',
+        status:
+          payment.status === 'completed'
+            ? 'completed'
+            : payment.status === 'overdue'
+              ? 'overdue'
+              : 'pending',
         method: payment.payment_method || payment.method,
         dueDate: payment.due_date || payment.dueDate || new Date().toISOString(),
-        description: payment.description || 'Pagamento de assinatura'
+        description: payment.description || 'Pagamento de assinatura',
       }));
 
       return {
         success: true,
-        data: payments
+        data: payments,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao obter meus pagamentos'
+        error: error.response?.data?.error || 'Erro ao obter meus pagamentos',
       };
     }
   },
@@ -199,15 +215,15 @@ export const paymentService = {
   async getPaymentsByVehicle(vehicleId: string): Promise<ApiResponse<Payment[]>> {
     try {
       const response = await api.get(`/payments?vehicle_id=${vehicleId}`);
-      
+
       return {
         success: true,
-        data: response.data.payments || response.data
+        data: response.data.payments || response.data,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao obter pagamentos do veículo'
+        error: error.response?.data?.error || 'Erro ao obter pagamentos do veículo',
       };
     }
   },
@@ -215,15 +231,15 @@ export const paymentService = {
   async getPaymentStatus(paymentId: string): Promise<ApiResponse<any>> {
     try {
       const response = await api.get(`/payments/${paymentId}`);
-      
+
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao obter status do pagamento'
+        error: error.response?.data?.error || 'Erro ao obter status do pagamento',
       };
     }
   },
@@ -231,15 +247,15 @@ export const paymentService = {
   async getPendingPayments(): Promise<ApiResponse<Payment[]>> {
     try {
       const response = await api.get('/payments?status=pending');
-      
+
       return {
         success: true,
-        data: response.data.payments || response.data
+        data: response.data.payments || response.data,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao obter pagamentos pendentes'
+        error: error.response?.data?.error || 'Erro ao obter pagamentos pendentes',
       };
     }
   },
@@ -247,15 +263,15 @@ export const paymentService = {
   async cancelPayment(paymentId: string): Promise<ApiResponse> {
     try {
       await api.delete(`/payments/${paymentId}`);
-      
+
       return {
         success: true,
-        message: 'Pagamento cancelado com sucesso'
+        message: 'Pagamento cancelado com sucesso',
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao cancelar pagamento'
+        error: error.response?.data?.error || 'Erro ao cancelar pagamento',
       };
     }
   },
@@ -263,11 +279,11 @@ export const paymentService = {
   async checkPaymentStatus(paymentId: string): Promise<ApiResponse<PixPaymentData>> {
     try {
       console.log(`[PaymentService] Verificando status do pagamento: ${paymentId}`);
-      
+
       // Detect if this is an Abacate Pay ID (starts with pix_char_) or internal payment ID
       const isAbacatePayId = paymentId.startsWith('pix_char_');
       let endpoint: string;
-      
+
       if (isAbacatePayId) {
         // Use the PIX status endpoint for Abacate Pay IDs
         endpoint = `/pix/check-status/${paymentId}`;
@@ -277,10 +293,10 @@ export const paymentService = {
         endpoint = `/payments/${paymentId}`;
         console.log(`[PaymentService] Usando endpoint payments para ID interno: ${paymentId}`);
       }
-      
+
       const response = await api.get(endpoint);
       console.log(`[PaymentService] Resposta da API:`, response.data);
-      
+
       const paymentData = {
         payment_id: response.data.payment_id || response.data.id || parseInt(paymentId),
         abacate_pay_id: response.data.abacate_pay_id || (isAbacatePayId ? paymentId : undefined),
@@ -296,26 +312,34 @@ export const paymentService = {
         is_recurring: response.data.is_recurring || false,
         next_payment_date: response.data.next_payment_date,
         created_at: response.data.created_at || new Date().toISOString(),
-        expires_at: response.data.expires_at || response.data.expiration_date
+        expires_at: response.data.expires_at || response.data.expiration_date,
       };
-      
-      console.log(`[PaymentService] Status obtido: ${paymentData.status} para pagamento ${paymentId}`);
-      
+
+      console.log(
+        `[PaymentService] Status obtido: ${paymentData.status} para pagamento ${paymentId}`
+      );
+
       return {
         success: true,
-        data: paymentData
+        data: paymentData,
       };
     } catch (error: any) {
       // Silently handle 404 errors as they are expected when payment is not found
       const status = error.response?.status;
       if (status !== 404) {
-        console.error(`[PaymentService] Erro ao verificar status do pagamento ${paymentId}:`, error);
+        console.error(
+          `[PaymentService] Erro ao verificar status do pagamento ${paymentId}:`,
+          error
+        );
         console.error(`[PaymentService] Detalhes do erro:`, error.response?.data);
       }
       return {
         success: false,
-        error: error.response?.data?.error || error.response?.data?.message || 'Erro ao verificar status do pagamento'
+        error:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          'Erro ao verificar status do pagamento',
       };
     }
-  }
+  },
 };

@@ -23,7 +23,9 @@ export interface PaymentReceiptData {
 }
 
 export const pdfService = {
-  async generateReceiptPDF(payment: PaymentReceiptData): Promise<{ success: boolean; uri?: string; error?: string }> {
+  async generateReceiptPDF(
+    payment: PaymentReceiptData
+  ): Promise<{ success: boolean; uri?: string; error?: string }> {
     try {
       const getStatusText = (status: string) => {
         switch (status) {
@@ -206,12 +208,16 @@ export const pdfService = {
                   <span class="info-label">ID do Pagamento:</span>
                   <span class="info-value payment-id">#${payment.id}</span>
                 </div>
-                ${payment.transaction_id ? `
+                ${
+                  payment.transaction_id
+                    ? `
                 <div class="info-row">
                   <span class="info-label">Transaction ID:</span>
                   <span class="info-value">${payment.transaction_id}</span>
                 </div>
-                ` : ''}
+                `
+                    : ''
+                }
                 <div class="info-row">
                   <span class="info-label">Status:</span>
                   <span class="status-badge status-${payment.status === 'paid' || payment.status === 'completed' ? 'paid' : payment.status === 'pending' ? 'pending' : 'overdue'}">
@@ -230,12 +236,16 @@ export const pdfService = {
                   <span class="info-label">Valor Base:</span>
                   <span class="info-value">${formatCurrency(payment.base_amount)}</span>
                 </div>
-                ${payment.interest_amount && payment.interest_amount > 0 ? `
+                ${
+                  payment.interest_amount && payment.interest_amount > 0
+                    ? `
                 <div class="info-row">
                   <span class="info-label">Juros de Atraso:</span>
                   <span class="info-value interest-value">+ ${formatCurrency(payment.interest_amount)}</span>
                 </div>
-                ` : ''}
+                `
+                    : ''
+                }
                 <div class="info-row total-row">
                   <span class="info-label">Total Pago:</span>
                   <span class="info-value total-value">${formatCurrency(payment.amount)}</span>
@@ -248,12 +258,16 @@ export const pdfService = {
                   <span class="info-label">Vencimento:</span>
                   <span class="info-value">${formatDateTime(payment.due_date)}</span>
                 </div>
-                ${payment.payment_date ? `
+                ${
+                  payment.payment_date
+                    ? `
                 <div class="info-row">
                   <span class="info-label">Data do Pagamento:</span>
                   <span class="info-value" style="color: #4caf50; font-weight: bold;">${formatDateTime(payment.payment_date)}</span>
                 </div>
-                ` : ''}
+                `
+                    : ''
+                }
                 <div class="info-row">
                   <span class="info-label">Criado em:</span>
                   <span class="info-value">${formatDateTime(payment.created_at)}</span>
@@ -266,12 +280,16 @@ export const pdfService = {
                   <span class="info-label">ID do Veículo:</span>
                   <span class="info-value">${payment.vehicle_id}</span>
                 </div>
-                ${payment.vehicle_name ? `
+                ${
+                  payment.vehicle_name
+                    ? `
                 <div class="info-row">
                   <span class="info-label">Veículo:</span>
                   <span class="info-value">${payment.vehicle_name}</span>
                 </div>
-                ` : ''}
+                `
+                    : ''
+                }
               </div>
 
               <div class="info-section">
@@ -287,11 +305,15 @@ export const pdfService = {
               <p class="footer-text">
                 Comprovante gerado em: ${formatDateTime(new Date().toISOString())}
               </p>
-              ${payment.status === 'paid' || payment.status === 'completed' ? `
+              ${
+                payment.status === 'paid' || payment.status === 'completed'
+                  ? `
               <p class="confirmation-text">
                 ✅ Pagamento confirmado e processado com sucesso
               </p>
-              ` : ''}
+              `
+                  : ''
+              }
               <p class="footer-text">
                 <strong>Nanquim Locações</strong> - Sistema de Gestão de Veículos<br>
                 Este é um documento oficial de comprovação de pagamento.
@@ -310,17 +332,19 @@ export const pdfService = {
       return { success: true, uri };
     } catch (error: any) {
       console.error('Erro ao gerar PDF:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Erro ao gerar PDF do comprovante' 
+      return {
+        success: false,
+        error: error.message || 'Erro ao gerar PDF do comprovante',
       };
     }
   },
 
-  async shareReceiptPDF(payment: PaymentReceiptData): Promise<{ success: boolean; error?: string }> {
+  async shareReceiptPDF(
+    payment: PaymentReceiptData
+  ): Promise<{ success: boolean; error?: string }> {
     try {
       const result = await this.generateReceiptPDF(payment);
-      
+
       if (!result.success || !result.uri) {
         return { success: false, error: result.error };
       }
@@ -339,10 +363,10 @@ export const pdfService = {
       return { success: true };
     } catch (error: any) {
       console.error('Erro ao compartilhar PDF:', error);
-      return { 
-        success: false, 
-        error: error.message || 'Erro ao compartilhar PDF' 
+      return {
+        success: false,
+        error: error.message || 'Erro ao compartilhar PDF',
       };
     }
-  }
+  },
 };

@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  RefreshControl,
-  Alert,
-  StyleSheet,
-  TouchableOpacity
-} from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import {
   Card,
   Title,
@@ -16,12 +9,17 @@ import {
   useTheme,
   Chip,
   Searchbar,
-  FAB
+  FAB,
+  Portal,
+  Dialog,
+  Button,
+  TextInput,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { adminService, AdminUser } from '../../services/adminService';
 import { formatCurrency } from '../../utils/dateUtils';
 import { Colors } from '../../constants/colors';
+import { styles } from './UsersListScreen.styles';
 
 interface UsersListScreenProps {
   navigation: any;
@@ -37,6 +35,17 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
   const [total, setTotal] = useState(0);
   const theme = useTheme();
 
+  // Create User Modal states
+  const [createUserVisible, setCreateUserVisible] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    phone: '',
+    document_number: '',
+  });
+
   useEffect(() => {
     loadUsers();
   }, []);
@@ -44,31 +53,31 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
   const loadUsers = async (pageNum = 1, reset = true) => {
     try {
       if (reset) setLoading(true);
-      
+
       // Load users with payment status information
       const [usersResult, paymentStatusResult] = await Promise.all([
         adminService.getAllUsers(pageNum, 100),
-        adminService.getUsersWithPaymentStatus()
+        adminService.getUsersWithPaymentStatus(),
       ]);
-      
+
       console.log('👥 Users loaded:', usersResult);
       console.log('💰 Payment status loaded:', paymentStatusResult);
 
       if (usersResult.success && usersResult.data) {
         let allUsers = usersResult.data.users || [];
-        
+
         // Merge payment status data
         if (paymentStatusResult.success && paymentStatusResult.data) {
           const paymentStatusMap = new Map(
             paymentStatusResult.data.map((u: AdminUser) => [u.id, u])
           );
-          
+
           allUsers = allUsers.map((user: AdminUser) => {
             const paymentData = paymentStatusMap.get(user.id);
             return paymentData ? { ...user, ...paymentData } : user;
           });
         }
-        
+
         // Log para debug - verificar se license_plate está vindo
         if (allUsers.length > 0) {
           console.log('📋 UsersListScreen - Sample user data:', {
@@ -76,15 +85,17 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
             email: allUsers[0].email,
             license_plate: allUsers[0].license_plate,
             vehicle_name: allUsers[0].vehicle_name,
-            payment_status: allUsers[0].payment_status
+            payment_status: allUsers[0].payment_status,
           });
         }
-        
+
         const regularUsers = allUsers.filter((user: AdminUser) => {
-          const isAdminByEmail = user.email?.includes('admin');
-          const isAdminByName = user.name?.toLowerCase().includes('administrador');
+          const isAdminByEmail = user.email?.toLowerCase().includes('admin');
+          const isAdminByName =
+            user.name?.toLowerCase().includes('administrador') ||
+            user.name?.toLowerCase().includes('admin');
           const isAdminByField = user.is_admin === true;
-          
+
           const isAdmin = isAdminByEmail || isAdminByName || isAdminByField;
           return !isAdmin;
         });
@@ -121,34 +132,110 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
 
   const getPaymentStatusColor = (status?: string) => {
     switch (status) {
-      case 'up_to_date': return { bg: '#E8F5E8', text: '#2E7D32' };
-      case 'overdue': return { bg: '#FFEBEE', text: '#D32F2F' };
-      case 'no_payments': return { bg: '#FFF3E0', text: '#F57C00' };
-      default: return { bg: '#F5F5F5', text: '#757575' };
+      case 'up_to_date':
+      case 'paid':
+      case 'completed':
+        return { bg: '#E8F5E8', text: '#2E7D32' };
+      case 'overdue':
+        return { bg: '#FFEBEE', text: '#D32F2F' };
+      case 'no_payments':
+        return { bg: '#FFF3E0', text: '#F57C00' };
+      case 'pending':
+        return { bg: '#FFF9E6', text: '#F57C00' };
+      default:
+        return { bg: '#FFF3E0', text: '#F57C00' };
     }
   };
 
   const getPaymentStatusText = (status?: string) => {
     switch (status) {
-      case 'up_to_date': return 'Em Dia';
-      case 'overdue': return 'Vencido';
-      case 'no_payments': return 'Sem Pagamentos';
-      default: return 'Indefinido';
+      case 'up_to_date':
+      case 'paid':
+      case 'completed':
+        return 'Em Dia';
+      case 'overdue':
+        return 'Vencido';
+      case 'no_payments':
+        return 'Sem Pagamentos';
+      case 'pending':
+        return 'Aguardando Pagamento';
+      default:
+        return 'Sem Pagamentos';
     }
   };
 
   const getPaymentStatusIcon = (status?: string) => {
     switch (status) {
-      case 'up_to_date': return 'checkmark-circle';
-      case 'overdue': return 'alert-circle';
-      case 'no_payments': return 'information-circle';
-      default: return 'help-circle';
+      case 'up_to_date':
+      case 'paid':
+      case 'completed':
+        return 'checkmark-circle';
+      case 'overdue':
+        return 'alert-circle';
+      case 'no_payments':
+        return 'information-circle';
+      case 'pending':
+        return 'time';
+      default:
+        return 'information-circle';
     }
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  const openCreateUserModal = () => {
+    setNewUserData({
+      name: '',
+      email: '',
+      password: '',
+      phone: '',
+      document_number: '',
+    });
+    setCreateUserVisible(true);
+  };
+
+  const closeCreateUserModal = () => {
+    setCreateUserVisible(false);
+  };
+
+  const handleCreateUser = async () => {
+    // Validações
+    if (!newUserData.name.trim()) {
+      Alert.alert('Erro', 'Nome é obrigatório');
+      return;
+    }
+    if (!newUserData.email.trim()) {
+      Alert.alert('Erro', 'Email é obrigatório');
+      return;
+    }
+    if (!newUserData.password || newUserData.password.length < 6) {
+      Alert.alert('Erro', 'Senha deve ter pelo menos 6 caracteres');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      console.log('➕ Criando novo usuário:', newUserData);
+      const result = await adminService.createUser(newUserData);
+
+      if (result.success) {
+        Alert.alert('Sucesso!', result.message || 'Usuário criado com sucesso');
+        closeCreateUserModal();
+        // Recarregar lista de usuários
+        loadUsers(1, true);
+      } else {
+        Alert.alert('Erro', result.error || 'Erro ao criar usuário');
+      }
+    } catch (error) {
+      console.error('Erro ao criar usuário:', error);
+      Alert.alert('Erro', 'Erro ao criar usuário');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const filteredUsers = users.filter(
+    user =>
+      user.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const renderUserCard = (user: AdminUser) => {
@@ -192,13 +279,13 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
             {/* Vehicle Info */}
             {(user.vehicle_name || user.license_plate) && (
               <View style={styles.vehicleSection}>
-                {user.vehicle_name && (
+                {!!user.vehicle_name && (
                   <View style={styles.vehicleItem}>
                     <Ionicons name="car-outline" size={16} color="#4CAF50" />
                     <Text style={styles.vehicleText}>{user.vehicle_name}</Text>
                   </View>
                 )}
-                {user.license_plate && (
+                {!!user.license_plate && (
                   <View style={styles.licensePlateContainer}>
                     <Ionicons name="card-outline" size={16} color={Colors.primary} />
                     <Text style={styles.licensePlateText}>{user.license_plate}</Text>
@@ -217,16 +304,18 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
                     <Text style={styles.paymentInfoValue}>{user.total_payments || 0}</Text>
                   </View>
                 </View>
-                
+
                 <View style={styles.paymentInfoItem}>
                   <Ionicons name="calendar-outline" size={20} color="#2196F3" />
                   <View style={styles.paymentInfoContent}>
                     <Text style={styles.paymentInfoLabel}>Último</Text>
                     <Text style={styles.paymentInfoValue}>
-                      {user.last_payment 
-                        ? new Date(user.last_payment).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-                        : 'N/A'
-                      }
+                      {user.last_payment
+                        ? new Date(user.last_payment).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                          })
+                        : 'N/A'}
                     </Text>
                   </View>
                 </View>
@@ -237,9 +326,7 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
                 <View style={styles.overdueAlert}>
                   <View style={styles.overdueRow}>
                     <Ionicons name="time-outline" size={16} color="#D32F2F" />
-                    <Text style={styles.overdueText}>
-                      {user.days_overdue || 0} dias em atraso
-                    </Text>
+                    <Text style={styles.overdueText}>{user.days_overdue || 0} dias em atraso</Text>
                   </View>
                   <View style={styles.overdueRow}>
                     <Ionicons name="cash-outline" size={16} color="#D32F2F" />
@@ -285,12 +372,11 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
 
       <ScrollView
         style={styles.scrollView}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
         onMomentumScrollEnd={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
-          const isCloseToBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
+          const isCloseToBottom =
+            layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
           if (isCloseToBottom && hasMore) {
             loadMore();
           }
@@ -305,215 +391,88 @@ export default function UsersListScreen({ navigation }: UsersListScreenProps) {
           </View>
         )}
       </ScrollView>
+
+      {/* FAB para criar usuário */}
+      <FAB
+        icon="plus"
+        label="Novo Usuário"
+        style={styles.fab}
+        onPress={openCreateUserModal}
+        color="#fff"
+      />
+
+      {/* Modal de Criar Usuário */}
+      <Portal>
+        <Dialog visible={createUserVisible} onDismiss={closeCreateUserModal}>
+          <Dialog.Title>Criar Novo Usuário</Dialog.Title>
+          <Dialog.ScrollArea>
+            <ScrollView style={{ maxHeight: 400 }}>
+              <TextInput
+                label="Nome *"
+                value={newUserData.name}
+                onChangeText={text => setNewUserData({ ...newUserData, name: text })}
+                mode="outlined"
+                style={{ marginBottom: 12 }}
+                disabled={creating}
+              />
+              <TextInput
+                label="Email *"
+                value={newUserData.email}
+                onChangeText={text => setNewUserData({ ...newUserData, email: text })}
+                mode="outlined"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                style={{ marginBottom: 12 }}
+                disabled={creating}
+              />
+              <TextInput
+                label="Senha *"
+                value={newUserData.password}
+                onChangeText={text => setNewUserData({ ...newUserData, password: text })}
+                mode="outlined"
+                secureTextEntry
+                style={{ marginBottom: 12 }}
+                disabled={creating}
+                placeholder="Mínimo 6 caracteres"
+              />
+              <TextInput
+                label="Telefone (Opcional)"
+                value={newUserData.phone}
+                onChangeText={text => setNewUserData({ ...newUserData, phone: text })}
+                mode="outlined"
+                keyboardType="phone-pad"
+                style={{ marginBottom: 12 }}
+                disabled={creating}
+              />
+              <TextInput
+                label="CPF (Opcional)"
+                value={newUserData.document_number}
+                onChangeText={text => setNewUserData({ ...newUserData, document_number: text })}
+                mode="outlined"
+                keyboardType="numeric"
+                style={{ marginBottom: 12 }}
+                disabled={creating}
+              />
+              <Text style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+                * Campos obrigatórios
+              </Text>
+            </ScrollView>
+          </Dialog.ScrollArea>
+          <Dialog.Actions>
+            <Button onPress={closeCreateUserModal} disabled={creating}>
+              Cancelar
+            </Button>
+            <Button
+              onPress={handleCreateUser}
+              disabled={creating}
+              loading={creating}
+              mode="contained"
+            >
+              Criar
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  header: {
-    padding: 20,
-    elevation: 2,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  searchContainer: {
-    padding: 16,
-  },
-  searchBar: {
-    elevation: 2,
-  },
-  scrollView: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  userCardContainer: {
-    marginBottom: 12,
-  },
-  userCard: {
-    elevation: 2,
-  },
-  userHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#666',
-  },
-  userStatus: {
-    marginLeft: 12,
-  },
-  userDetails: {
-    gap: 8,
-  },
-  detailItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  loadMoreContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    gap: 10,
-  },
-  loadMoreText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  userNameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-  },
-  phoneText: {
-    fontSize: 13,
-    color: '#666',
-  },
-  paymentStatusBadge: {
-    marginTop: 12,
-    marginBottom: 12,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 6,
-  },
-  statusBadgeText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  vehicleSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingVertical: 8,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E0E0E0',
-    marginVertical: 12,
-  },
-  vehicleItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  vehicleText: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '500',
-  },
-  licensePlateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  licensePlateText: {
-    fontSize: 14,
-    color: Colors.primary,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  paymentInfoSection: {
-    backgroundColor: '#F8F9FA',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  paymentInfoGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 16,
-  },
-  paymentInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  paymentInfoContent: {
-    flex: 1,
-  },
-  paymentInfoLabel: {
-    fontSize: 11,
-    color: '#666',
-    marginBottom: 2,
-  },
-  paymentInfoValue: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#000',
-  },
-  overdueAlert: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#FFCDD2',
-    gap: 6,
-  },
-  overdueRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  overdueText: {
-    fontSize: 13,
-    color: '#D32F2F',
-    fontWeight: '500',
-  },
-  overdueAmount: {
-    fontSize: 13,
-    color: '#D32F2F',
-    fontWeight: '700',
-  },
-});

@@ -15,18 +15,18 @@ export const API_CONFIG = {
     PROFILE: '/auth/profile',
     LOGOUT: '/auth/logout',
     REFRESH_TOKEN: '/auth/refresh-token',
-    
+
     VEHICLES: '/vehicles',
     USER_VEHICLES: '/vehicles/user',
     RENT_VEHICLE: '/vehicles/:id/rent',
     RETURN_VEHICLE: '/vehicles/:id/return',
     EXTEND_RENTAL: '/vehicles/:id/extend',
-    
+
     PAYMENTS: '/payments',
     PAYMENT_HISTORY: '/payments/history',
     PAYMENT_BY_ID: '/payments/:id',
     PAYMENT_HISTORY_BY_ID: '/payments/:id/history',
-    
+
     ADMIN_DASHBOARD: '/admin/dashboard',
     ADMIN_USERS: '/admin/users',
     ADMIN_PAYMENTS: '/admin/payments',
@@ -35,7 +35,7 @@ export const API_CONFIG = {
     ADMIN_USER_STATUS: '/admin/users/:id/status',
     ADMIN_ANALYTICS: '/admin/analytics/payments',
     ADMIN_REPORTS: '/admin/reports/payments',
-    
+
     WEBHOOK_ABACATE_PAY: '/webhook/abacatepay',
   },
 };
@@ -73,12 +73,12 @@ export const buildEndpoint = (endpoint: string, params?: Record<string, string>)
 
 export const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
-  'Accept': 'application/json',
+  Accept: 'application/json',
   'X-Requested-With': 'XMLHttpRequest',
 };
 
 export const TIMEOUT_CONFIG = {
-  SHORT: 5000,    
-  MEDIUM: 10000,  
-  LONG: 30000,    
+  SHORT: 5000,
+  MEDIUM: 10000,
+  LONG: 30000,
 };

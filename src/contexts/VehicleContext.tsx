@@ -33,10 +33,7 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
   const loadInitialData = async (): Promise<void> => {
     setLoading(true);
     try {
-      await Promise.all([
-        loadVehicles(),
-        loadPaymentHistory()
-      ]);
+      await Promise.all([loadVehicles(), loadPaymentHistory()]);
     } catch (error) {
       console.error('Erro ao carregar dados iniciais:', error);
     } finally {
@@ -58,14 +55,20 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
       } else {
         console.error('Erro ao carregar veículos:', response.error);
       }
-    } catch (error) {
-      console.error('Erro ao carregar veículos:', error);
+    } catch (error: any) {
+      if (error.isTokenExpired) {
+        console.log(
+          '⚠️ [VehicleContext] Token expirado ao carregar veículos - será necessário fazer login novamente'
+        );
+      } else {
+        console.error('Erro ao carregar veículos:', error);
+      }
     }
   };
 
   const loadPaymentHistory = async (): Promise<void> => {
     try {
-      // Skip loading personal payment history for admin users
+      // Skip loading payment history for admin users
       if (user?.is_admin === true) {
         setPaymentHistory([]);
         return;
@@ -77,8 +80,14 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
       } else {
         console.error('Erro ao carregar histórico de pagamentos:', response.error);
       }
-    } catch (error) {
-      console.error('Erro ao carregar histórico de pagamentos:', error);
+    } catch (error: any) {
+      if (error.isTokenExpired) {
+        console.log(
+          '⚠️ [VehicleContext] Token expirado ao carregar pagamentos - será necessário fazer login novamente'
+        );
+      } else {
+        console.error('Erro ao carregar histórico de pagamentos:', error);
+      }
     }
   };
 
@@ -91,20 +100,20 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
   };
 
   const getPaymentsByVehicle = (vehicleId: number): Payment[] => {
-    return paymentHistory.filter(payment => 
-      payment.vehicle_id === vehicleId || 
-      parseInt(payment.vehicleId || '0') === vehicleId
+    return paymentHistory.filter(
+      payment =>
+        payment.vehicle_id === vehicleId || parseInt(payment.vehicleId || '0') === vehicleId
     );
   };
 
   const getPendingPayments = (): Payment[] => {
-    return paymentHistory.filter(payment => 
-      payment.status === 'pending' || payment.status === 'overdue'
+    return paymentHistory.filter(
+      payment => payment.status === 'pending' || payment.status === 'overdue'
     );
   };
 
   const processPayment = async (
-    paymentId: number, 
+    paymentId: number,
     paymentMethod: PaymentMethod
   ): Promise<ApiResponse> => {
     try {
@@ -116,7 +125,7 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
       console.error('Erro ao processar pagamento:', error);
       return {
         success: false,
-        error: 'Erro interno do servidor'
+        error: 'Erro interno do servidor',
       };
     }
   };
@@ -142,12 +151,8 @@ export const VehicleProvider: React.FC<VehicleProviderProps> = ({ children }) =>
     processPayment,
     updatePaymentStatus,
     loadVehicles,
-    refreshData
+    refreshData,
   };
 
-  return (
-    <VehicleContext.Provider value={value}>
-      {children}
-    </VehicleContext.Provider>
-  );
+  return <VehicleContext.Provider value={value}>{children}</VehicleContext.Provider>;
 };

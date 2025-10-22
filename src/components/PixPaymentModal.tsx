@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  Alert,
-  Clipboard,
-  Dimensions,
-  ScrollView
-} from 'react-native';
+import { View, StyleSheet, Alert, Clipboard, Dimensions, ScrollView } from 'react-native';
 import {
   Modal,
   Portal,
@@ -17,7 +10,7 @@ import {
   Surface,
   ActivityIndicator,
   useTheme,
-  Divider
+  Divider,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
@@ -35,11 +28,11 @@ interface PixPaymentModalProps {
 
 const { width } = Dimensions.get('window');
 
-export default function PixPaymentModal({ 
-  visible, 
-  onDismiss, 
+export default function PixPaymentModal({
+  visible,
+  onDismiss,
   paymentData,
-  onPaymentConfirmed 
+  onPaymentConfirmed,
 }: PixPaymentModalProps) {
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [checkingPayment, setCheckingPayment] = useState<boolean>(false);
@@ -55,10 +48,12 @@ export default function PixPaymentModal({
     if (!paymentData?.expires_at) return;
 
     const calculateTimeLeft = () => {
-      const expirationTime = new Date(paymentData.expires_at || new Date(Date.now() + 30 * 60 * 1000)).getTime();
+      const expirationTime = new Date(
+        paymentData.expires_at || new Date(Date.now() + 30 * 60 * 1000)
+      ).getTime();
       const currentTime = new Date().getTime();
       const difference = expirationTime - currentTime;
-      
+
       return Math.max(0, Math.floor(difference / 1000));
     };
 
@@ -67,7 +62,7 @@ export default function PixPaymentModal({
     const timer = setInterval(() => {
       const remaining = calculateTimeLeft();
       setTimeLeft(remaining);
-      
+
       if (remaining <= 0) {
         clearInterval(timer);
       }
@@ -81,49 +76,49 @@ export default function PixPaymentModal({
     if (!visible || !paymentData?.payment_id) return;
 
     setPaymentStatus(paymentData.status || 'pending');
-    
+
     const checkPaymentStatus = async () => {
       const now = Date.now();
-      
+
       // Avoid duplicate calls within 2 seconds
       if (now - lastStatusCheckRef.current < 2000) {
         return;
       }
       lastStatusCheckRef.current = now;
-      
+
       try {
         setCheckingPayment(true);
         // Use abacate_pay_id for checking status if available, otherwise fall back to payment_id
         const checkId = paymentData.abacate_pay_id || paymentData.payment_id.toString();
         console.log(`[PixPaymentModal] Verificando status com ID: ${checkId}`);
         const result = await paymentService.checkPaymentStatus(checkId);
-        
+
         if (result.success && result.data) {
           const newStatus = result.data.status;
           setPaymentStatus(newStatus);
           setRetryCount(0); // Reset retry count on success
-          
+
           // Optimize polling frequency based on status
           if (newStatus === 'pending') {
             setPollingInterval(5000); // Check every 5 seconds for pending
           } else if (newStatus === 'processing') {
             setPollingInterval(2000); // Check every 2 seconds when processing
           }
-          
+
           // If payment is confirmed, notify and close modal
           if (newStatus === 'paid' || newStatus === 'confirmed') {
             if (pollingIntervalRef.current) {
               clearInterval(pollingIntervalRef.current);
               pollingIntervalRef.current = null;
             }
-            
+
             // Update payment data in context
             try {
               await updatePaymentStatus(paymentData.payment_id);
             } catch (updateError) {
               console.warn('Falha ao atualizar dados locais:', updateError);
             }
-            
+
             Alert.alert(
               'Pagamento Confirmado! ✅',
               'Seu pagamento PIX foi processado com sucesso!',
@@ -133,8 +128,8 @@ export default function PixPaymentModal({
                   onPress: () => {
                     onPaymentConfirmed?.();
                     onDismiss();
-                  }
-                }
+                  },
+                },
               ]
             );
           }
@@ -150,9 +145,9 @@ export default function PixPaymentModal({
         setRetryCount(prev => prev + 1);
         const backoffInterval = Math.min(30000, 5000 * Math.pow(1.5, retryCount));
         setPollingInterval(backoffInterval);
-        
+
         // Silently handle connectivity issues during polling
-        
+
         // Only stop polling if payment has expired
         if (timeLeft <= 0) {
           if (pollingIntervalRef.current) {
@@ -172,9 +167,9 @@ export default function PixPaymentModal({
       }
       pollingIntervalRef.current = setInterval(checkPaymentStatus, pollingInterval);
     };
-    
+
     startPolling();
-    
+
     // Initial check
     checkPaymentStatus();
 
@@ -189,7 +184,7 @@ export default function PixPaymentModal({
   // Effect to update polling interval when it changes
   useEffect(() => {
     if (!visible || !pollingIntervalRef.current) return;
-    
+
     // Restart polling with new interval
     clearInterval(pollingIntervalRef.current);
     pollingIntervalRef.current = setInterval(() => {
@@ -199,31 +194,32 @@ export default function PixPaymentModal({
           const now = Date.now();
           if (now - lastStatusCheckRef.current < 2000) return;
           lastStatusCheckRef.current = now;
-          
+
           try {
             setCheckingPayment(true);
             // Use abacate_pay_id for checking status if available, otherwise fall back to payment_id
-            const checkId = paymentData?.abacate_pay_id || paymentData?.payment_id?.toString() || '';
+            const checkId =
+              paymentData?.abacate_pay_id || paymentData?.payment_id?.toString() || '';
             console.log(`[PixPaymentModal] Verificando status (polling) com ID: ${checkId}`);
             const result = await paymentService.checkPaymentStatus(checkId);
-            
+
             if (result.success && result.data) {
               const newStatus = result.data.status;
               setPaymentStatus(newStatus);
               setRetryCount(0);
-              
+
               if (newStatus === 'paid' || newStatus === 'confirmed') {
                 if (pollingIntervalRef.current) {
                   clearInterval(pollingIntervalRef.current);
                   pollingIntervalRef.current = null;
                 }
-                
+
                 try {
                   await updatePaymentStatus(paymentData?.payment_id || 0);
                 } catch (updateError) {
                   console.warn('Falha ao atualizar dados locais:', updateError);
                 }
-                
+
                 Alert.alert(
                   'Pagamento Confirmado! ✅',
                   'Seu pagamento PIX foi processado com sucesso!',
@@ -233,8 +229,8 @@ export default function PixPaymentModal({
                       onPress: () => {
                         onPaymentConfirmed?.();
                         onDismiss();
-                      }
-                    }
+                      },
+                    },
                   ]
                 );
               }
@@ -245,12 +241,19 @@ export default function PixPaymentModal({
             setCheckingPayment(false);
           }
         };
-        
+
         checkPaymentStatus();
       }
     }, pollingInterval);
-    
-  }, [pollingInterval, visible, paymentStatus, paymentData?.payment_id, updatePaymentStatus, onPaymentConfirmed, onDismiss]);
+  }, [
+    pollingInterval,
+    visible,
+    paymentStatus,
+    paymentData?.payment_id,
+    updatePaymentStatus,
+    onPaymentConfirmed,
+    onDismiss,
+  ]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -266,19 +269,15 @@ export default function PixPaymentModal({
   };
 
   const handlePaymentConfirmed = () => {
-    Alert.alert(
-      'Pagamento Confirmado',
-      'Seu pagamento foi processado com sucesso!',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            onPaymentConfirmed?.();
-            onDismiss();
-          }
-        }
-      ]
-    );
+    Alert.alert('Pagamento Confirmado', 'Seu pagamento foi processado com sucesso!', [
+      {
+        text: 'OK',
+        onPress: () => {
+          onPaymentConfirmed?.();
+          onDismiss();
+        },
+      },
+    ]);
   };
 
   if (!paymentData) return null;
@@ -311,34 +310,58 @@ export default function PixPaymentModal({
             </Surface>
 
             {/* Payment Status Badge */}
-            <View style={[
-              styles.statusBadge,
-              { backgroundColor: 
-                paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#E8F5E9' :
-                paymentStatus === 'pending' ? '#FFF9E6' : '#FFEBEE'
-              }
-            ]}>
-              <Ionicons 
+            <View
+              style={[
+                styles.statusBadge,
+                {
+                  backgroundColor:
+                    paymentStatus === 'paid' || paymentStatus === 'confirmed'
+                      ? '#E8F5E9'
+                      : paymentStatus === 'pending'
+                        ? '#FFF9E6'
+                        : '#FFEBEE',
+                },
+              ]}
+            >
+              <Ionicons
                 name={
-                  paymentStatus === 'paid' || paymentStatus === 'confirmed' ? 'checkmark-circle' :
-                  paymentStatus === 'pending' ? 'time-outline' : 'alert-circle'
-                } 
-                size={18} 
-                color={
-                  paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#4CAF50' :
-                  paymentStatus === 'pending' ? '#FFA726' : '#EF5350'
-                } 
-              />
-              <Text style={[
-                styles.statusText,
-                { color: paymentStatus === 'paid' || paymentStatus === 'confirmed' ? '#2E7D32' :
-                  paymentStatus === 'pending' ? '#F57C00' : '#C62828'
+                  paymentStatus === 'paid' || paymentStatus === 'confirmed'
+                    ? 'checkmark-circle'
+                    : paymentStatus === 'pending'
+                      ? 'time-outline'
+                      : 'alert-circle'
                 }
-              ]}>
-                {paymentStatus === 'paid' || paymentStatus === 'confirmed' ? 'Pagamento Confirmado' :
-                 paymentStatus === 'pending' ? 'Aguardando Pagamento' : 'Verificando...'}
+                size={18}
+                color={
+                  paymentStatus === 'paid' || paymentStatus === 'confirmed'
+                    ? '#4CAF50'
+                    : paymentStatus === 'pending'
+                      ? '#FFA726'
+                      : '#EF5350'
+                }
+              />
+              <Text
+                style={[
+                  styles.statusText,
+                  {
+                    color:
+                      paymentStatus === 'paid' || paymentStatus === 'confirmed'
+                        ? '#2E7D32'
+                        : paymentStatus === 'pending'
+                          ? '#F57C00'
+                          : '#C62828',
+                  },
+                ]}
+              >
+                {paymentStatus === 'paid' || paymentStatus === 'confirmed'
+                  ? 'Pagamento Confirmado'
+                  : paymentStatus === 'pending'
+                    ? 'Aguardando Pagamento'
+                    : 'Verificando...'}
               </Text>
-              {checkingPayment && <ActivityIndicator size="small" color="#666" style={{ marginLeft: 8 }} />}
+              {checkingPayment && (
+                <ActivityIndicator size="small" color="#666" style={{ marginLeft: 8 }} />
+              )}
             </View>
 
             {/* Timer Badge */}
@@ -391,26 +414,34 @@ export default function PixPaymentModal({
                 labelStyle={styles.copyButtonLabel}
                 disabled={!paymentData.pix_copy_paste}
               >
-                Copiar Código
+                <Text>Copiar Código</Text>
               </Button>
             </Surface>
 
             {/* Instructions Card */}
             <Surface style={styles.instructionsCard}>
               <View style={styles.instructionRow}>
-                <View style={styles.stepBadge}><Text style={styles.stepNumber}>1</Text></View>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepNumber}>1</Text>
+                </View>
                 <Text style={styles.instructionText}>Abra o app do seu banco</Text>
               </View>
               <View style={styles.instructionRow}>
-                <View style={styles.stepBadge}><Text style={styles.stepNumber}>2</Text></View>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepNumber}>2</Text>
+                </View>
                 <Text style={styles.instructionText}>Escolha pagar com PIX</Text>
               </View>
               <View style={styles.instructionRow}>
-                <View style={styles.stepBadge}><Text style={styles.stepNumber}>3</Text></View>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepNumber}>3</Text>
+                </View>
                 <Text style={styles.instructionText}>Escaneie ou cole o código</Text>
               </View>
               <View style={styles.instructionRow}>
-                <View style={styles.stepBadge}><Text style={styles.stepNumber}>4</Text></View>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepNumber}>4</Text>
+                </View>
                 <Text style={styles.instructionText}>Confirme o pagamento</Text>
               </View>
             </Surface>
@@ -423,7 +454,7 @@ export default function PixPaymentModal({
                 style={styles.confirmButton}
                 labelStyle={styles.confirmButtonLabel}
               >
-                Já Paguei
+                <Text>Já Paguei</Text>
               </Button>
               <Button
                 mode="text"
@@ -431,7 +462,7 @@ export default function PixPaymentModal({
                 style={styles.cancelButton}
                 labelStyle={styles.cancelButtonLabel}
               >
-                Fechar
+                <Text>Fechar</Text>
               </Button>
             </View>
           </ScrollView>
@@ -442,234 +473,47 @@ export default function PixPaymentModal({
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  actionButtons: {
+    gap: 12,
+    marginBottom: 8,
   },
-  modalContent: {
-    backgroundColor: '#F8F9FA',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '92%',
-    paddingTop: 8,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingTop: 16,
-    paddingBottom: 20,
-  },
-  headerIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 22,
+  amount: {
+    color: '#4169E1',
+    fontSize: 36,
     fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '400',
+    marginBottom: 4,
   },
   amountCard: {
+    alignItems: 'center',
     backgroundColor: 'white',
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    alignItems: 'center',
     elevation: 2,
+    marginBottom: 16,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
   },
   amountLabel: {
-    fontSize: 13,
     color: '#757575',
-    marginBottom: 4,
+    fontSize: 13,
     fontWeight: '500',
-    textTransform: 'uppercase',
     letterSpacing: 0.5,
-  },
-  amount: {
-    fontSize: 36,
-    fontWeight: '700',
-    color: '#4169E1',
     marginBottom: 4,
+    textTransform: 'uppercase',
   },
-  interestNote: {
-    fontSize: 12,
-    color: '#FF6B6B',
-    marginTop: 4,
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  cancelButton: {
     borderRadius: 12,
-    marginBottom: 12,
   },
-  statusText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  timerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFE5E5',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  timerText: {
-    marginLeft: 6,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FF6B6B',
-  },
-  qrCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  sectionTitle: {
+  cancelButtonLabel: {
+    color: '#757575',
     fontSize: 15,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginLeft: 8,
-  },
-  qrWrapper: {
-    marginTop: 16,
-  },
-  qrCodeContainer: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-  },
-  qrPlaceholder: {
-    width: 180,
-    height: 180,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-  },
-  qrPlaceholderText: {
-    marginTop: 12,
-    fontSize: 13,
-    color: '#9E9E9E',
-    textAlign: 'center',
-  },
-  pixCodeCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  pixCodeHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  pixCodeBox: {
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  pixCode: {
-    fontSize: 11,
-    fontFamily: 'monospace',
-    color: '#424242',
-    lineHeight: 16,
-  },
-  copyButton: {
-    borderRadius: 10,
-    backgroundColor: '#4169E1',
-  },
-  copyButtonLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    paddingVertical: 4,
-  },
-  instructionsCard: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-  },
-  instructionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  stepBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#E3F2FD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  stepNumber: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#4169E1',
-  },
-  instructionText: {
-    fontSize: 14,
-    color: '#424242',
-    flex: 1,
-  },
-  actionButtons: {
-    gap: 12,
-    marginBottom: 8,
+    fontWeight: '500',
   },
   confirmButton: {
-    borderRadius: 12,
     backgroundColor: '#4CAF50',
+    borderRadius: 12,
     elevation: 0,
   },
   confirmButtonLabel: {
@@ -677,12 +521,199 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     paddingVertical: 8,
   },
-  cancelButton: {
-    borderRadius: 12,
+  copyButton: {
+    backgroundColor: '#4169E1',
+    borderRadius: 10,
   },
-  cancelButtonLabel: {
+  copyButtonLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    paddingVertical: 4,
+  },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    paddingBottom: 20,
+    paddingTop: 16,
+  },
+  headerIconContainer: {
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 48,
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  instructionRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  instructionText: {
+    color: '#424242',
+    flex: 1,
+    fontSize: 14,
+  },
+  instructionsCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    elevation: 2,
+    marginBottom: 20,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  interestNote: {
+    color: '#FF6B6B',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  modalContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#F8F9FA',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '92%',
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  pixCode: {
+    color: '#424242',
+    fontFamily: 'monospace',
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  pixCodeBox: {
+    backgroundColor: '#F8F9FA',
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+    padding: 16,
+  },
+  pixCodeCard: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    elevation: 2,
+    marginBottom: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  pixCodeHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    marginBottom: 12,
+  },
+  qrCard: {
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 16,
+    elevation: 2,
+    marginBottom: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+  },
+  qrCodeContainer: {
+    backgroundColor: 'white',
+    borderColor: '#E0E0E0',
+    borderRadius: 12,
+    borderWidth: 2,
+    padding: 16,
+  },
+  qrPlaceholder: {
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    height: 180,
+    justifyContent: 'center',
+    width: 180,
+  },
+  qrPlaceholderText: {
+    color: '#9E9E9E',
+    fontSize: 13,
+    marginTop: 12,
+    textAlign: 'center',
+  },
+  qrWrapper: {
+    marginTop: 16,
+  },
+  sectionTitle: {
+    color: '#1a1a1a',
     fontSize: 15,
-    fontWeight: '500',
-    color: '#757575',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  statusBadge: {
+    alignItems: 'center',
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  stepBadge: {
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    borderRadius: 14,
+    height: 28,
+    justifyContent: 'center',
+    marginRight: 12,
+    width: 28,
+  },
+  stepNumber: {
+    color: '#4169E1',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  subtitle: {
+    color: '#666',
+    fontSize: 13,
+    fontWeight: '400',
+  },
+  timerBadge: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    backgroundColor: '#FFE5E5',
+    borderRadius: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  timerText: {
+    color: '#FF6B6B',
+    fontSize: 13,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  title: {
+    color: '#1a1a1a',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 2,
   },
 });

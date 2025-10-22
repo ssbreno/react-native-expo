@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
+import { View, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
 import {
   Card,
   Text,
@@ -19,12 +13,12 @@ import {
   Surface,
   Divider,
 } from 'react-native-paper';
-import { StyleSheet } from 'react-native';
 import { vehicleService } from '../../services/vehicleService';
 import { Vehicle, VehicleUpdateData } from '../../types';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types';
+import { styles } from './VehicleEditScreen.styles';
 
 type VehicleEditScreenNavigationProp = StackNavigationProp<RootStackParamList, 'VehicleEdit'>;
 type VehicleEditScreenRouteProp = RouteProp<RootStackParamList, 'VehicleEdit'>;
@@ -36,11 +30,11 @@ interface VehicleEditScreenProps {
 
 export default function VehicleEditScreen({ route, navigation }: VehicleEditScreenProps) {
   const { vehicleId } = route.params;
-  
+
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   // Form state
   const [formData, setFormData] = useState<VehicleUpdateData>({
     brand: '',
@@ -64,7 +58,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
     try {
       setLoading(true);
       const result = await vehicleService.getVehicleById(vehicleId.toString());
-      
+
       if (result.success && result.data) {
         setVehicle(result.data);
         // Populate form with existing data
@@ -100,7 +94,10 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
       return;
     }
 
-    if (formData.manufacture_year < 1900 || formData.manufacture_year > new Date().getFullYear() + 1) {
+    if (
+      formData.manufacture_year < 1900 ||
+      formData.manufacture_year > new Date().getFullYear() + 1
+    ) {
       Alert.alert('Erro', 'Ano de fabricação inválido');
       return;
     }
@@ -113,13 +110,11 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
     try {
       setSaving(true);
       const result = await vehicleService.updateVehicle(vehicleId, formData);
-      
+
       if (result.success) {
-        Alert.alert(
-          'Sucesso', 
-          'Veículo atualizado com sucesso!',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
+        Alert.alert('Sucesso', 'Veículo atualizado com sucesso!', [
+          { text: 'OK', onPress: () => navigation.goBack() },
+        ]);
       } else {
         Alert.alert('Erro', result.error || 'Erro ao atualizar veículo');
       }
@@ -133,7 +128,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
   const updateFormData = (field: keyof VehicleUpdateData, value: any) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: value,
     }));
   };
 
@@ -147,28 +142,24 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container} 
+    <KeyboardAvoidingView
+      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <Appbar.Header>
         <Appbar.BackAction onPress={() => navigation.goBack()} />
         <Appbar.Content title="Editar Veículo" />
-        <Appbar.Action 
-          icon="content-save" 
-          onPress={handleSave}
-          disabled={saving}
-        />
+        <Appbar.Action icon="content-save" onPress={handleSave} disabled={saving} />
       </Appbar.Header>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <Surface style={styles.formContainer}>
           <Title style={styles.sectionTitle}>Informações Básicas</Title>
-          
+
           <TextInput
             label="Marca *"
             value={formData.brand}
-            onChangeText={(text) => updateFormData('brand', text)}
+            onChangeText={text => updateFormData('brand', text)}
             mode="outlined"
             style={styles.input}
             placeholder="Ex: Toyota, Honda, Ford"
@@ -177,7 +168,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
           <TextInput
             label="Modelo *"
             value={formData.model}
-            onChangeText={(text) => updateFormData('model', text)}
+            onChangeText={text => updateFormData('model', text)}
             mode="outlined"
             style={styles.input}
             placeholder="Ex: Corolla, Civic, Fiesta"
@@ -186,7 +177,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
           <TextInput
             label="Cor"
             value={formData.color}
-            onChangeText={(text) => updateFormData('color', text)}
+            onChangeText={text => updateFormData('color', text)}
             mode="outlined"
             style={styles.input}
             placeholder="Ex: Branco, Preto, Prata"
@@ -195,7 +186,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
           <TextInput
             label="Chassi"
             value={formData.chassis}
-            onChangeText={(text) => updateFormData('chassis', text)}
+            onChangeText={text => updateFormData('chassis', text)}
             mode="outlined"
             style={styles.input}
             placeholder="Número do chassi"
@@ -208,7 +199,9 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
             <TextInput
               label="Ano de Fabricação"
               value={formData.manufacture_year.toString()}
-              onChangeText={(text) => updateFormData('manufacture_year', parseInt(text) || new Date().getFullYear())}
+              onChangeText={text =>
+                updateFormData('manufacture_year', parseInt(text) || new Date().getFullYear())
+              }
               mode="outlined"
               style={[styles.input, styles.halfWidth]}
               keyboardType="numeric"
@@ -217,7 +210,9 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
             <TextInput
               label="Ano do Modelo"
               value={formData.model_year.toString()}
-              onChangeText={(text) => updateFormData('model_year', parseInt(text) || new Date().getFullYear())}
+              onChangeText={text =>
+                updateFormData('model_year', parseInt(text) || new Date().getFullYear())
+              }
               mode="outlined"
               style={[styles.input, styles.halfWidth]}
               keyboardType="numeric"
@@ -227,7 +222,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
           <TextInput
             label="Quilometragem (km)"
             value={formData.mileage.toString()}
-            onChangeText={(text) => updateFormData('mileage', parseInt(text) || 0)}
+            onChangeText={text => updateFormData('mileage', parseInt(text) || 0)}
             mode="outlined"
             style={styles.input}
             keyboardType="numeric"
@@ -239,7 +234,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
           <Text style={styles.label}>Tipo de Combustível</Text>
           <SegmentedButtons
             value={formData.fuel_type}
-            onValueChange={(value) => updateFormData('fuel_type', value)}
+            onValueChange={value => updateFormData('fuel_type', value)}
             buttons={[
               { value: 'gasoline', label: 'Gasolina' },
               { value: 'ethanol', label: 'Etanol' },
@@ -256,7 +251,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
           <TextInput
             label="Preço (R$)"
             value={formData.price.toString()}
-            onChangeText={(text) => updateFormData('price', parseFloat(text) || 0)}
+            onChangeText={text => updateFormData('price', parseFloat(text) || 0)}
             mode="outlined"
             style={styles.input}
             keyboardType="numeric"
@@ -266,7 +261,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
           <Text style={styles.label}>Status do Veículo</Text>
           <SegmentedButtons
             value={formData.status}
-            onValueChange={(value) => updateFormData('status', value)}
+            onValueChange={value => updateFormData('status', value)}
             buttons={[
               { value: 'ativo', label: 'Ativo' },
               { value: 'inativo', label: 'Inativo' },
@@ -280,7 +275,7 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
           <TextInput
             label="Descrição"
             value={formData.description}
-            onChangeText={(text) => updateFormData('description', text)}
+            onChangeText={text => updateFormData('description', text)}
             mode="outlined"
             style={styles.input}
             multiline
@@ -296,72 +291,10 @@ export default function VehicleEditScreen({ route, navigation }: VehicleEditScre
             style={styles.saveButton}
             contentStyle={styles.saveButtonContent}
           >
-            {saving ? 'Salvando...' : 'Salvar Alterações'}
+            {saving ? <Text>Salvando...</Text> : <Text>Salvar Alterações</Text>}
           </Button>
         </Surface>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  formContainer: {
-    margin: 16,
-    padding: 16,
-    borderRadius: 12,
-    elevation: 4,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333',
-  },
-  input: {
-    marginBottom: 16,
-  },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  halfWidth: {
-    flex: 1,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
-  },
-  segmentedButtons: {
-    marginBottom: 16,
-  },
-  divider: {
-    marginVertical: 24,
-  },
-  saveButton: {
-    marginTop: 24,
-    marginBottom: 16,
-  },
-  saveButtonContent: {
-    paddingVertical: 8,
-  },
-});

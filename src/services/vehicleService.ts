@@ -8,12 +8,12 @@ export const vehicleService = {
       const response = await api.get('/vehicles');
       return {
         success: true,
-        data: response.data.vehicles || response.data
+        data: response.data.vehicles || response.data,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao obter lista de veículos'
+        error: error.response?.data?.error || 'Erro ao obter lista de veículos',
       };
     }
   },
@@ -23,12 +23,12 @@ export const vehicleService = {
       const response = await api.get(`/vehicles/${id}`);
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao obter detalhes do veículo'
+        error: error.response?.data?.error || 'Erro ao obter detalhes do veículo',
       };
     }
   },
@@ -36,25 +36,28 @@ export const vehicleService = {
   async getUserVehicles(): Promise<ApiResponse<Vehicle[]>> {
     try {
       const userVehicleId = await getUserVehicleIdFromToken();
-      
+
       if (!userVehicleId) {
         return {
           success: true,
-          data: []
+          data: [],
         };
       }
 
       const response = await api.get(`/vehicles/${userVehicleId}`);
-      
+
       const vehicleData = response.data;
       return {
         success: true,
-        data: [vehicleData]
+        data: [vehicleData],
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || error.response?.data?.message || 'Erro ao obter veículos do usuário'
+        error:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          'Erro ao obter veículos do usuário',
       };
     }
   },
@@ -64,14 +67,13 @@ export const vehicleService = {
       const response = await api.put(`/vehicles/${id}`, vehicleData);
       return {
         success: true,
-        data: response.data
+        data: response.data,
       };
     } catch (error: any) {
       return {
         success: false,
-        error: error.response?.data?.error || 'Erro ao atualizar veículo'
+        error: error.response?.data?.error || 'Erro ao atualizar veículo',
       };
     }
   },
-
 };

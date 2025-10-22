@@ -23,9 +23,7 @@ import VehicleEditScreen from './src/screens/user/VehicleEditScreen';
 import PaymentHistoryScreen from './src/screens/user/PaymentHistoryScreen';
 import SubscriptionScreen from './src/screens/user/SubscriptionScreen';
 import ProfileScreen from './src/screens/user/ProfileScreen';
-
-// Admin screens
-import AdminDashboardScreen from './src/screens/admin/AdminDashboardScreen';
+import ChangePasswordScreen from './src/screens/user/ChangePasswordScreen';
 
 // Import types
 import { RootStackParamList, MainTabParamList } from './src/types';
@@ -89,29 +87,29 @@ function MainTabNavigator() {
         },
       })}
     >
-      <Tab.Screen 
-        name="Veículos" 
+      <Tab.Screen
+        name="Veículos"
         component={VehicleListScreen}
         options={{
           title: 'Meus Veículos',
         }}
       />
-      <Tab.Screen 
-        name="Histórico" 
+      <Tab.Screen
+        name="Histórico"
         component={PaymentHistoryScreen}
         options={{
           title: 'Pagamentos',
         }}
       />
-      <Tab.Screen 
-        name="Assinatura" 
+      <Tab.Screen
+        name="Assinatura"
         component={SubscriptionScreen}
         options={{
           title: 'Assinatura',
         }}
       />
-      <Tab.Screen 
-        name="Perfil" 
+      <Tab.Screen
+        name="Perfil"
         component={ProfileScreen}
         options={{
           title: 'Meu Perfil',
@@ -125,26 +123,15 @@ function AppNavigator() {
   const { isAuthenticated, loading, user } = useAuth();
 
   // Check if user is admin using multiple criteria
-  const isAdmin = user?.is_admin === true || 
-                  user?.isAdmin === true || 
-                  user?.email === 'admin@vehicles.com' || 
-                  user?.email?.toLowerCase().includes('admin');
-
-  console.log('🚀 AppNavigator - Auth Status:', { 
-    isAuthenticated, 
-    loading, 
-    user: user?.email, 
-    is_admin_field: user?.is_admin,
-    isAdmin_field: user?.isAdmin,
-    calculated_isAdmin: isAdmin 
-  });
+  const isAdmin =
+    user?.is_admin === true ||
+    user?.isAdmin === true ||
+    user?.email === 'admin@vehicles.com' ||
+    user?.email?.toLowerCase().includes('admin');
 
   if (loading) {
-    console.log('🚀 AppNavigator - Showing loading state');
     return null; // You could show a loading screen here
   }
-
-  console.log('🚀 AppNavigator - Rendering navigation with auth:', isAuthenticated, 'isAdmin:', isAdmin);
 
   return (
     <Stack.Navigator
@@ -159,85 +146,85 @@ function AppNavigator() {
       }}
     >
       {!isAuthenticated ? (
-        <Stack.Screen 
-          name="Login" 
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
+        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
       ) : isAdmin ? (
         // Admin Navigation
         <>
-          <Stack.Screen 
-            name="AdminDashboard" 
-            component={AdminDashboardScreen}
-            options={{ 
+          <Stack.Screen
+            name="AdminDashboard"
+            component={require('./src/screens/admin/AdminDashboardScreen').default}
+            options={{
               title: 'Painel Administrativo',
-              headerBackTitle: 'Voltar'
+              headerBackTitle: 'Voltar',
             }}
           />
-          <Stack.Screen 
-            name="UsersList" 
+          <Stack.Screen
+            name="UsersList"
             component={require('./src/screens/admin/UsersListScreen').default}
-            options={{ 
+            options={{
               title: 'Lista de Usuários',
-              headerBackTitle: 'Voltar'
+              headerBackTitle: 'Voltar',
             }}
           />
-          <Stack.Screen 
-            name="UserDetails" 
+          <Stack.Screen
+            name="UserDetails"
             component={require('./src/screens/admin/UserDetailsScreen').default}
-            options={{ 
+            options={{
               title: 'Detalhes do Usuário',
-              headerBackTitle: 'Voltar'
+              headerBackTitle: 'Voltar',
             }}
           />
-          <Stack.Screen 
-            name="UpdateOverduePayments" 
+          <Stack.Screen
+            name="UpdateOverduePayments"
             component={require('./src/screens/admin/UpdateOverduePaymentsScreen').default}
-            options={{ 
+            options={{
               title: 'Pagamentos Vencidos',
-              headerBackTitle: 'Voltar'
+              headerBackTitle: 'Voltar',
             }}
           />
         </>
       ) : (
         // Regular User Navigation
         <>
-          <Stack.Screen 
-            name="Main" 
-            component={MainTabNavigator}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="VehicleDetail" 
+          <Stack.Screen name="Main" component={MainTabNavigator} options={{ headerShown: false }} />
+          <Stack.Screen
+            name="VehicleDetail"
             component={VehicleDetailScreen}
-            options={{ 
+            options={{
               title: 'Detalhes do Veículo',
-              headerBackTitle: 'Voltar'
+              headerBackTitle: 'Voltar',
             }}
           />
-          <Stack.Screen 
-            name="VehicleEdit" 
+          <Stack.Screen
+            name="VehicleEdit"
             component={VehicleEditScreen}
-            options={{ 
+            options={{
               title: 'Editar Veículo',
-              headerBackTitle: 'Voltar'
+              headerBackTitle: 'Voltar',
             }}
           />
-          <Stack.Screen 
-            name="UsersList" 
+          <Stack.Screen
+            name="ChangePassword"
+            component={ChangePasswordScreen}
+            options={{
+              title: 'Alterar Senha',
+              headerBackTitle: 'Voltar',
+            }}
+          />
+          <Stack.Screen
+            name="UsersList"
             component={require('./src/screens/admin/UsersListScreen').default}
-            options={{ 
+            options={{
               title: 'Lista de Usuários',
-              headerBackTitle: 'Voltar'
+              headerBackTitle: 'Voltar',
             }}
           />
-          <Stack.Screen 
-            name="UserDetails" 
+          <Stack.Screen
+            name="UserDetails"
             component={require('./src/screens/admin/UserDetailsScreen').default}
-            options={{ 
+            options={{
               title: 'Detalhes do Usuário',
-              headerBackTitle: 'Voltar'
+              headerBackTitle: 'Voltar',
             }}
           />
         </>

@@ -7,21 +7,26 @@ export class Logger {
     const timestamp = new Date().toISOString();
     const prefix = this.getLevelPrefix(level);
     let formattedMessage = `${timestamp} ${prefix} ${message}`;
-    
+
     if (data) {
       formattedMessage += `\n${JSON.stringify(data, null, 2)}`;
     }
-    
+
     return formattedMessage;
   }
 
   private static getLevelPrefix(level: LogLevel): string {
     switch (level) {
-      case 'debug': return '🐛';
-      case 'info': return 'ℹ️';
-      case 'warn': return '⚠️';
-      case 'error': return '❌';
-      default: return '📝';
+      case 'debug':
+        return '🐛';
+      case 'info':
+        return 'ℹ️';
+      case 'warn':
+        return '⚠️';
+      case 'error':
+        return '❌';
+      default:
+        return '📝';
     }
   }
 
@@ -49,10 +54,11 @@ export class Logger {
 
   public static error(message: string, error?: Error | any): void {
     if (this.shouldLog('error')) {
-      const errorData = error instanceof Error 
-        ? { name: error.name, message: error.message, stack: error.stack }
-        : error;
-      
+      const errorData =
+        error instanceof Error
+          ? { name: error.name, message: error.message, stack: error.stack }
+          : error;
+
       console.error(this.formatMessage('error', message, errorData));
     }
   }

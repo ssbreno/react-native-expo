@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import {
-  View,
-  ScrollView,
-  RefreshControl,
-  Alert,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { View, ScrollView, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import {
   Card,
   Title,
@@ -17,7 +10,7 @@ import {
   useTheme,
   Divider,
   Chip,
-  SegmentedButtons
+  SegmentedButtons,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { adminService, DashboardStats, AdminUser } from '../../services/adminService';
@@ -25,6 +18,7 @@ import { vehicleService } from '../../services/vehicleService';
 import { formatCurrency } from '../../utils/dateUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/colors';
+import { styles } from './AdminDashboardScreen.styles';
 
 interface AdminDashboardScreenProps {
   navigation: any;
@@ -36,12 +30,16 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
   const [usersWithPaymentStatus, setUsersWithPaymentStatus] = useState<AdminUser[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<AdminUser[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<any>(null);
+  const [weeklyEvolution, setWeeklyEvolution] = useState<any>(null);
   const [totalUsers, setTotalUsers] = useState(0);
   const [totalVehicles, setTotalVehicles] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingOverdue, setUpdatingOverdue] = useState(false);
+  const [notifyingOverdue, setNotifyingOverdue] = useState(false);
+  const [notifyingPending, setNotifyingPending] = useState(false);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [weeksPeriod, setWeeksPeriod] = useState('4');
   const theme = useTheme();
   const { logout, user } = useAuth();
 
@@ -52,13 +50,22 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [statsResult, usersResult, vehiclesResult, allUsersResult, paymentStatusResult, paymentSummaryResult] = await Promise.all([
+      const [
+        statsResult,
+        usersResult,
+        vehiclesResult,
+        allUsersResult,
+        paymentStatusResult,
+        paymentSummaryResult,
+        weeklyResult,
+      ] = await Promise.all([
         adminService.getDashboardStats(),
         adminService.getAllUsers(1, 5),
         vehicleService.getVehicles(),
         adminService.getAllUsers(1, 1000),
         adminService.getUsersWithPaymentStatus(),
-        adminService.getPaymentSummary()
+        adminService.getPaymentSummary(),
+        adminService.getWeeklyPaymentEvolution(parseInt(weeksPeriod)),
       ]);
 
       console.log('📊 Stats Result:', JSON.stringify(statsResult, null, 2));
@@ -76,9 +83,15 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
             name: user.name,
             email: user.email,
             payment_status: user.payment_status,
-            has_payment_status: !!user.payment_status
+            total_payments: user.total_payments,
+            has_payment_status: !!user.payment_status,
           });
         });
+      }
+
+      if (weeklyResult.success && weeklyResult.data) {
+        console.log('📊 Weekly Evolution Data:', weeklyResult.data);
+        setWeeklyEvolution(weeklyResult.data);
       }
 
       if (statsResult.success && statsResult.data) {
@@ -98,23 +111,39 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
       setStatusFilter('all');
 
       if (usersResult.success && usersResult.data) {
-        const allUsers = usersResult.data.users || [];
-        
+        let allUsers = usersResult.data.users || [];
+
+        // Merge payment status data into recent users
+        if (paymentStatusResult.success && paymentStatusResult.data) {
+          const paymentStatusMap = new Map(
+            paymentStatusResult.data.map((u: AdminUser) => [u.id, u])
+          );
+
+          allUsers = allUsers.map((user: AdminUser) => {
+            const paymentData = paymentStatusMap.get(user.id);
+            return paymentData ? { ...user, ...paymentData } : user;
+          });
+        }
+
         // Log para debug - verificar dados dos usuários recentes
         if (allUsers.length > 0) {
           console.log('📊 Dashboard - Recent users sample:', {
             name: allUsers[0].name,
             email: allUsers[0].email,
             license_plate: allUsers[0].license_plate,
-            vehicle_name: allUsers[0].vehicle_name
+            vehicle_name: allUsers[0].vehicle_name,
+            total_payments: allUsers[0].total_payments,
+            last_payment: allUsers[0].last_payment,
           });
         }
-        
+
         const regularUsers = allUsers.filter((user: AdminUser) => {
-          const isAdminByEmail = user.email?.includes('admin');
-          const isAdminByName = user.name?.toLowerCase().includes('administrador');
+          const isAdminByEmail = user.email?.toLowerCase().includes('admin');
+          const isAdminByName =
+            user.name?.toLowerCase().includes('administrador') ||
+            user.name?.toLowerCase().includes('admin');
           const isAdminByField = user.is_admin === true;
-          
+
           const isAdmin = isAdminByEmail || isAdminByName || isAdminByField;
           return !isAdmin;
         });
@@ -123,28 +152,29 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
 
       if (allUsersResult.success && allUsersResult.data) {
         const allUsers = allUsersResult.data.users || [];
-        
+
         const regularUsersCount = allUsers.filter((user: AdminUser) => {
-          const isAdminByEmail = user.email?.includes('admin');
-          const isAdminByName = user.name?.toLowerCase().includes('administrador');
+          const isAdminByEmail = user.email?.toLowerCase().includes('admin');
+          const isAdminByName =
+            user.name?.toLowerCase().includes('administrador') ||
+            user.name?.toLowerCase().includes('admin');
           const isAdminByField = user.is_admin === true;
-          
+
           const isAdmin = isAdminByEmail || isAdminByName || isAdminByField;
           return !isAdmin;
         }).length;
-    
+
         setTotalUsers(regularUsersCount);
       }
 
       // Count active vehicles
       if (vehiclesResult.success && vehiclesResult.data) {
-        const activeVehicles = vehiclesResult.data.filter((vehicle: any) => 
-          vehicle.status === 'ativo' || vehicle.status === 'active'
+        const activeVehicles = vehiclesResult.data.filter(
+          (vehicle: any) => vehicle.status === 'ativo' || vehicle.status === 'active'
         ).length;
         console.log('🚗 Active vehicles count:', activeVehicles);
         setTotalVehicles(activeVehicles);
       }
-
     } catch (error) {
       console.error('Erro ao carregar dashboard:', error);
       Alert.alert('Erro', 'Erro ao carregar dados do dashboard');
@@ -163,13 +193,11 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
     setUpdatingOverdue(true);
     try {
       const result = await adminService.updateOverduePayments();
-      
+
       if (result.success) {
-        Alert.alert(
-          'Sucesso!',
-          result.message || 'Pagamentos em atraso atualizados',
-          [{ text: 'OK', onPress: () => loadDashboardData() }]
-        );
+        Alert.alert('Sucesso!', result.message || 'Pagamentos em atraso atualizados', [
+          { text: 'OK', onPress: () => loadDashboardData() },
+        ]);
       } else {
         Alert.alert('Erro', result.error || 'Erro ao atualizar pagamentos');
       }
@@ -180,25 +208,81 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
     }
   };
 
-  const handleLogout = async () => {
+  const handleNotifyOverdueUsers = async () => {
     Alert.alert(
-      'Sair do Sistema',
-      'Tem certeza que deseja sair do painel administrativo?',
+      'Notificar Usuários',
+      'Deseja enviar notificações para todos os usuários com pagamentos vencidos?',
       [
         { text: 'Cancelar', style: 'cancel' },
-        { 
-          text: 'Sair', 
-          style: 'destructive',
+        {
+          text: 'Enviar',
           onPress: async () => {
+            setNotifyingOverdue(true);
             try {
-              await logout();
+              const result = await adminService.notifyOverdueUsers();
+
+              if (result.success) {
+                Alert.alert('Sucesso!', result.message || 'Notificações enviadas', [
+                  { text: 'OK' },
+                ]);
+              } else {
+                Alert.alert('Erro', result.error || 'Erro ao enviar notificações');
+              }
             } catch (error) {
-              console.error('Erro ao fazer logout:', error);
+              Alert.alert('Erro', 'Erro interno do servidor');
+            } finally {
+              setNotifyingOverdue(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
+  };
+
+  const handleNotifyPendingPayments = async () => {
+    Alert.alert(
+      'Lembrar Pagamentos',
+      'Deseja enviar lembretes para usuários com pagamentos próximos do vencimento?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Enviar',
+          onPress: async () => {
+            setNotifyingPending(true);
+            try {
+              const result = await adminService.notifyPendingPayments(3);
+
+              if (result.success) {
+                Alert.alert('Sucesso!', result.message || 'Lembretes enviados', [{ text: 'OK' }]);
+              } else {
+                Alert.alert('Erro', result.error || 'Erro ao enviar lembretes');
+              }
+            } catch (error) {
+              Alert.alert('Erro', 'Erro interno do servidor');
+            } finally {
+              setNotifyingPending(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleLogout = async () => {
+    Alert.alert('Sair do Sistema', 'Tem certeza que deseja sair do painel administrativo?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sair',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await logout();
+          } catch (error) {
+            console.error('Erro ao fazer logout:', error);
+          }
+        },
+      },
+    ]);
   };
 
   const renderStatsCard = (title: string, value: string | number, icon: string, color: string) => (
@@ -217,7 +301,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
 
   const renderEnhancedUserCard = (user: AdminUser, showPaymentStatus = false) => {
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         key={user.id}
         activeOpacity={0.7}
         onPress={() => navigation.navigate('UserDetails', { userId: user.id })}
@@ -230,7 +314,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                   <Title style={styles.userName}>{user.name}</Title>
                   <Ionicons name="chevron-forward" size={20} color="#666" />
                 </View>
-                
+
                 <View style={styles.contactInfo}>
                   <View style={styles.contactRow}>
                     <Ionicons name="mail-outline" size={16} color="#666" />
@@ -240,7 +324,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                     <Ionicons name="call-outline" size={16} color="#666" />
                     <Text style={styles.contactText}>{user.phone || 'N/A'}</Text>
                   </View>
-                  {user.vehicle_name && (
+                  {!!user.vehicle_name && (
                     <View style={styles.contactRow}>
                       <Ionicons name="car-outline" size={16} color="#4CAF50" />
                       <Text style={[styles.contactText, { color: '#4CAF50', fontWeight: '500' }]}>
@@ -248,10 +332,15 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                       </Text>
                     </View>
                   )}
-                  {user.license_plate && (
+                  {!!user.license_plate && (
                     <View style={styles.contactRow}>
                       <Ionicons name="card-outline" size={16} color={Colors.primary} />
-                      <Text style={[styles.contactText, { color: Colors.primary, fontWeight: '600', letterSpacing: 1 }]}>
+                      <Text
+                        style={[
+                          styles.contactText,
+                          { color: Colors.primary, fontWeight: '600', letterSpacing: 1 },
+                        ]}
+                      >
                         {user.license_plate}
                       </Text>
                     </View>
@@ -259,9 +348,9 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                 </View>
               </View>
             </View>
-            
+
             <Divider style={styles.modernDivider} />
-            
+
             {/* Enhanced Payment Information - Always visible */}
             <View style={styles.enhancedPaymentSection}>
               <View style={styles.paymentRow}>
@@ -277,7 +366,12 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
                   <View style={styles.paymentInfoText}>
                     <Text style={styles.paymentInfoLabel}>Último Pagamento</Text>
                     <Text style={styles.paymentInfoValue}>
-                      {user.last_payment ? new Date(user.last_payment).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : 'N/A'}
+                      {user.last_payment
+                        ? new Date(user.last_payment).toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                          })
+                        : 'N/A'}
                     </Text>
                   </View>
                 </View>
@@ -308,22 +402,22 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
         value: paymentSummary.up_to_date_users || 0,
         color: '#4CAF50',
         icon: 'checkmark-circle',
-        filter: 'up_to_date'
+        filter: 'up_to_date',
       },
       {
-        label: 'Vencidos', 
+        label: 'Vencidos',
         value: paymentSummary.overdue_users || 0,
         color: '#F44336',
         icon: 'warning',
-        filter: 'overdue'
+        filter: 'overdue',
       },
       {
         label: 'Sem Pagamentos',
         value: usersWithPaymentStatus.filter(u => u.payment_status === 'no_payments').length,
         color: '#FF9800',
         icon: 'alert-circle',
-        filter: 'no_payments'
-      }
+        filter: 'no_payments',
+      },
     ];
 
     return (
@@ -336,7 +430,7 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
               style={[
                 styles.quickStatItem,
                 { borderColor: stat.color },
-                statusFilter === stat.filter && { backgroundColor: stat.color + '15' }
+                statusFilter === stat.filter && { backgroundColor: stat.color + '15' },
               ]}
               onPress={() => filterUsersByStatus(stat.filter)}
             >
@@ -353,19 +447,27 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
   const renderPaymentStatusUserCard = (user: AdminUser) => {
     const getPaymentStatusColor = (status?: string) => {
       switch (status) {
-        case 'up_to_date': return '#4CAF50';
-        case 'overdue': return '#F44336';
-        case 'no_payments': return '#FF9800';
-        default: return '#666';
+        case 'up_to_date':
+          return '#4CAF50';
+        case 'overdue':
+          return '#F44336';
+        case 'no_payments':
+          return '#FF9800';
+        default:
+          return '#666';
       }
     };
 
     const getPaymentStatusLabel = (status?: string) => {
       switch (status) {
-        case 'up_to_date': return 'Em Dia';
-        case 'overdue': return 'Vencido';
-        case 'no_payments': return 'Sem Pagamentos';
-        default: return 'Indefinido';
+        case 'up_to_date':
+          return 'Em Dia';
+        case 'overdue':
+          return 'Vencido';
+        case 'no_payments':
+          return 'Sem Pagamentos';
+        default:
+          return 'Indefinido';
       }
     };
 
@@ -376,27 +478,27 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
             <View style={styles.userInfo}>
               <Title style={styles.userName}>{user.name}</Title>
               <Text style={styles.userEmail}>{user.email}</Text>
-              {user.vehicle_name && (
+              {!!user.vehicle_name && (
                 <Text style={styles.vehicleName}>Veículo: {user.vehicle_name}</Text>
               )}
             </View>
-            <Chip 
-              mode="flat" 
+            <Chip
+              mode="flat"
               style={[
                 styles.paymentStatusChip,
-                { backgroundColor: getPaymentStatusColor(user.payment_status) + '20' }
+                { backgroundColor: getPaymentStatusColor(user.payment_status) + '20' },
               ]}
-              textStyle={{ 
+              textStyle={{
                 color: getPaymentStatusColor(user.payment_status),
-                fontWeight: 'bold'
+                fontWeight: 'bold',
               }}
             >
               {getPaymentStatusLabel(user.payment_status)}
             </Chip>
           </View>
-          
+
           <Divider style={styles.userDivider} />
-          
+
           <View style={styles.userStats}>
             {user.payment_status === 'overdue' && (
               <>
@@ -418,7 +520,9 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
               <View style={styles.userStat}>
                 <Text style={styles.userStatLabel}>Último Pagamento</Text>
                 <Text style={[styles.userStatValue, { color: '#4CAF50' }]}>
-                  {user.last_payment ? new Date(user.last_payment).toLocaleDateString('pt-BR') : 'N/A'}
+                  {user.last_payment
+                    ? new Date(user.last_payment).toLocaleDateString('pt-BR')
+                    : 'N/A'}
                 </Text>
               </View>
             )}
@@ -446,11 +550,9 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
   }
 
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
       {/* Header */}
       <Surface style={styles.header}>
@@ -458,14 +560,9 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
           <View style={styles.headerLeft}>
             <Title style={styles.headerTitle}>Dashboard Administrativo</Title>
             <Text style={styles.headerSubtitle}>Visão geral do sistema</Text>
-            {user && (
-              <Text style={styles.welcomeText}>Olá, {user.name}</Text>
-            )}
+            {user && <Text style={styles.welcomeText}>Olá, {user.name}</Text>}
           </View>
-          <TouchableOpacity 
-            style={styles.logoutButton}
-            onPress={handleLogout}
-          >
+          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={24} color="#F44336" />
             <Text style={styles.logoutText}>Sair</Text>
           </TouchableOpacity>
@@ -474,18 +571,193 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
 
       {/* Stats Grid */}
       <View style={styles.statsGrid}>
-        {renderStatsCard('Total Usuários', totalUsers || stats?.total_users || 0, 'people-outline', '#2196F3')}
-        {renderStatsCard('Total Pagamentos', stats?.total_payments ?? 0, 'card-outline', '#4CAF50')}
-        {renderStatsCard('Receita Total', stats?.total_revenue ?? 0, 'cash-outline', '#FF9800')}
-        {renderStatsCard('Pagamentos Pendentes', stats?.pending_payments ?? 0, 'time-outline', '#FFC107')}
-        {renderStatsCard('Pagamentos Vencidos', stats?.overdue_payments ?? 0, 'warning-outline', '#F44336')}
-        {renderStatsCard('Veículos Ativos', totalVehicles || stats?.active_vehicles || 0, 'car-outline', '#9C27B0')}
+        {renderStatsCard(
+          'Aguardando Pagamento',
+          stats?.pending_payments ?? 0,
+          'time-outline',
+          '#FFC107'
+        )}
+        {renderStatsCard('Vencidos', stats?.overdue_payments ?? 0, 'warning-outline', '#F44336')}
+        {renderStatsCard(
+          'Pagos',
+          (stats?.total_payments ?? 0) -
+            (stats?.pending_payments ?? 0) -
+            (stats?.overdue_payments ?? 0),
+          'checkmark-circle-outline',
+          '#4CAF50'
+        )}
       </View>
+
+      {/* Weekly Payment Evolution */}
+      {weeklyEvolution && weeklyEvolution.weeks && (
+        <Surface style={styles.weeklyEvolutionCard}>
+          <View style={styles.sectionHeaderRow}>
+            <Ionicons name="trending-up" size={24} color={Colors.primary} />
+            <Title style={styles.sectionTitleWithIcon}>Evolução Semanal de Pagamentos</Title>
+          </View>
+
+          <View style={styles.weeksPeriodSelector}>
+            <SegmentedButtons
+              value={weeksPeriod}
+              onValueChange={value => {
+                setWeeksPeriod(value);
+                setRefreshing(true);
+                loadDashboardData();
+              }}
+              buttons={[
+                { value: '4', label: '4 Semanas' },
+                { value: '8', label: '8 Semanas' },
+                { value: '12', label: '12 Semanas' },
+              ]}
+              style={styles.segmentedButtons}
+            />
+          </View>
+
+          <View style={styles.weeklyCardsContainer}>
+            {weeklyEvolution.weeks.map((week: any, index: number) => (
+              <Card key={index} style={styles.weekCard}>
+                <Card.Content>
+                  <View style={styles.weekHeader}>
+                    <Text style={styles.weekNumber}>Semana {week.week_number}</Text>
+                    <Chip mode="outlined" compact style={styles.weekDateChip}>
+                      {new Date(week.week_start).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                      })}{' '}
+                      -{' '}
+                      {new Date(week.week_end).toLocaleDateString('pt-BR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                      })}
+                    </Chip>
+                  </View>
+
+                  <Divider style={styles.weekDivider} />
+
+                  <View style={styles.weekStatsGrid}>
+                    <View style={styles.weekStatItem}>
+                      <Ionicons name="receipt-outline" size={20} color="#2196F3" />
+                      <Text style={styles.weekStatValue}>{week.total_payments || 0}</Text>
+                      <Text style={styles.weekStatLabel}>Total</Text>
+                    </View>
+
+                    <View style={styles.weekStatItem}>
+                      <Ionicons name="checkmark-circle-outline" size={20} color="#4CAF50" />
+                      <Text style={styles.weekStatValue}>{week.completed_payments || 0}</Text>
+                      <Text style={styles.weekStatLabel}>Pagos</Text>
+                    </View>
+
+                    <View style={styles.weekStatItem}>
+                      <Ionicons name="time-outline" size={20} color="#FF9800" />
+                      <Text style={styles.weekStatValue}>{week.pending_payments || 0}</Text>
+                      <Text style={styles.weekStatLabel}>Pendentes</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.weekAmountContainer}>
+                    <Text style={styles.weekAmountLabel}>Valor Total:</Text>
+                    <Text style={styles.weekAmountValue}>
+                      {formatCurrency(week.total_amount || 0)}
+                    </Text>
+                  </View>
+
+                  {/* Lista de Usuários que Pagaram */}
+                  {week.paid_users && week.paid_users.length > 0 && (
+                    <>
+                      <Divider style={styles.weekDivider} />
+                      <View style={styles.usersSection}>
+                        <View style={styles.usersSectionHeader}>
+                          <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                          <Text style={styles.usersSectionTitle}>
+                            Pagaram ({week.paid_users.length})
+                          </Text>
+                        </View>
+                        {week.paid_users.map((user: any, userIndex: number) => (
+                          <View key={userIndex} style={styles.userItem}>
+                            <View style={styles.userItemLeft}>
+                              <Ionicons name="person-circle-outline" size={18} color="#4CAF50" />
+                              <View style={styles.userItemInfo}>
+                                <Text style={styles.userItemName}>{user.user_name || 'N/A'}</Text>
+                                <View style={styles.vehicleInfo}>
+                                  <Ionicons name="car-outline" size={14} color="#666" />
+                                  <Text style={styles.vehicleText}>
+                                    {user.vehicle_name || 'N/A'}
+                                  </Text>
+                                  <Text style={styles.licensePlate}>
+                                    {user.license_plate || 'N/A'}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                            <View style={styles.userItemRight}>
+                              <Text style={styles.paidAmount}>
+                                {formatCurrency(user.amount || 0)}
+                              </Text>
+                              <Text style={styles.paymentDate}>
+                                {new Date(user.payment_date).toLocaleDateString('pt-BR', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                })}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  )}
+
+                  {/* Lista de Usuários que NÃO Pagaram */}
+                  {week.unpaid_users && week.unpaid_users.length > 0 && (
+                    <>
+                      <Divider style={styles.weekDivider} />
+                      <View style={styles.usersSection}>
+                        <View style={styles.usersSectionHeader}>
+                          <Ionicons name="alert-circle" size={20} color="#F44336" />
+                          <Text style={[styles.usersSectionTitle, { color: '#F44336' }]}>
+                            Não Pagaram ({week.unpaid_users.length})
+                          </Text>
+                        </View>
+                        {week.unpaid_users.map((user: any, userIndex: number) => (
+                          <View key={userIndex} style={styles.userItem}>
+                            <View style={styles.userItemLeft}>
+                              <Ionicons name="person-circle-outline" size={18} color="#F44336" />
+                              <View style={styles.userItemInfo}>
+                                <Text style={styles.userItemName}>{user.user_name || 'N/A'}</Text>
+                                <View style={styles.vehicleInfo}>
+                                  <Ionicons name="car-outline" size={14} color="#666" />
+                                  <Text style={styles.vehicleText}>
+                                    {user.vehicle_name || 'N/A'}
+                                  </Text>
+                                  <Text style={styles.licensePlate}>
+                                    {user.license_plate || 'N/A'}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                            <View style={styles.userItemRight}>
+                              <Text style={styles.unpaidAmount}>
+                                {formatCurrency(user.expected_amount || 0)}
+                              </Text>
+                              <Text style={styles.overdueDaysLabel}>
+                                {user.days_overdue || 0} dias
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                </Card.Content>
+              </Card>
+            ))}
+          </View>
+        </Surface>
+      )}
 
       {/* Admin Actions */}
       <Surface style={styles.actionsCard}>
         <Title style={styles.sectionTitle}>Ações Administrativas</Title>
-        
+
         <Button
           mode="contained"
           onPress={handleUpdateOverduePayments}
@@ -513,6 +785,36 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
         >
           Atualizar Pagamentos Vencidos
         </Button>
+
+        {/* NOTIFICAÇÕES PUSH - DESABILITADAS TEMPORARIAMENTE
+        Para reativar:
+        1. Descomentar os botões abaixo
+        2. Alterar EXPO_PUBLIC_ENABLE_PUSH_NOTIFICATIONS para "true" em app.json
+        3. Adicionar plugin expo-notifications no app.json
+        4. Fazer rebuild: npx expo run:ios / npx expo run:android
+        
+        <Button
+          mode="contained"
+          onPress={handleNotifyOverdueUsers}
+          disabled={notifyingOverdue}
+          style={[styles.actionButton, { backgroundColor: '#F44336' }]}
+          icon="notifications-outline"
+          buttonColor="#F44336"
+        >
+          {notifyingOverdue ? 'Enviando...' : 'Notificar Pagamentos Vencidos'}
+        </Button>
+
+        <Button
+          mode="contained"
+          onPress={handleNotifyPendingPayments}
+          disabled={notifyingPending}
+          style={[styles.actionButton, { backgroundColor: '#FF9800' }]}
+          icon="alarm-outline"
+          buttonColor="#FF9800"
+        >
+          {notifyingPending ? 'Enviando...' : 'Lembrar Pagamentos Pendentes'}
+        </Button>
+        */}
       </Surface>
 
       {/* Recent Users */}
@@ -520,445 +822,12 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
         <View style={styles.sectionHeader}>
           <Title style={styles.sectionTitle}>Usuários Recentes</Title>
           <TouchableOpacity onPress={() => navigation.navigate('UsersList')}>
-            <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>
-              Ver todos
-            </Text>
+            <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>Ver todos</Text>
           </TouchableOpacity>
         </View>
-        
+
         {users.map(user => renderEnhancedUserCard(user, false))}
       </Surface>
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  header: {
-    padding: 20,
-    marginBottom: 16,
-    elevation: 4,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  headerLeft: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  headerSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
-  },
-  welcomeText: {
-    fontSize: 14,
-    color: Colors.primary,
-    marginTop: 8,
-    fontWeight: '500',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFEBEE',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  logoutText: {
-    fontSize: 14,
-    color: '#F44336',
-    fontWeight: '500',
-  },
-  statsGrid: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  statCard: {
-    marginBottom: 12,
-    padding: 16,
-    elevation: 2,
-    backgroundColor: 'white',
-    borderLeftWidth: 4,
-    borderRadius: 8,
-  },
-  statContent: {
-    flexDirection: 'column',
-  },
-  statHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  statTitle: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 8,
-    flex: 1,
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  actionsCard: {
-    margin: 16,
-    padding: 20,
-    elevation: 2,
-    backgroundColor: 'white',
-    borderRadius: 8,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#333',
-  },
-  actionButton: {
-    marginBottom: 12,
-  },
-  usersSection: {
-    margin: 16,
-    padding: 20,
-    elevation: 2,
-    backgroundColor: 'white',
-    borderRadius: 8,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  seeAllText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  userCard: {
-    marginBottom: 12,
-    elevation: 1,
-  },
-  userHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 2,
-  },
-  userPhone: {
-    fontSize: 14,
-    color: '#666',
-  },
-  vehicleName: {
-    fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: '500',
-    marginTop: 2,
-  },
-  statusChip: {
-    height: 32,
-  },
-  paymentStatusChip: {
-    height: 32,
-    borderRadius: 16,
-  },
-  userDivider: {
-    marginVertical: 12,
-  },
-  userStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  userStat: {
-    alignItems: 'center',
-  },
-  userStatLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  userStatValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-  },
-  summaryCard: {
-    margin: 16,
-    padding: 20,
-    elevation: 2,
-    backgroundColor: 'white',
-    borderRadius: 8,
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  summaryItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  summaryValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  summaryLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  enhancedUserCard: {
-    marginBottom: 16,
-    elevation: 3,
-    borderRadius: 12,
-    backgroundColor: 'white',
-  },
-  userMainInfo: {
-    flex: 1,
-  },
-  userNameRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  modernStatusChip: {
-    height: 28,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-  },
-  contactInfo: {
-    gap: 8,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  contactText: {
-    fontSize: 14,
-    color: '#666',
-    flex: 1,
-  },
-  modernDivider: {
-    marginVertical: 16,
-    backgroundColor: '#E0E0E0',
-  },
-  paymentStatusInfo: {
-    marginTop: 8,
-  },
-  overdueInfo: {
-    backgroundColor: '#FFEBEE',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#F44336',
-  },
-  overdueItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-  },
-  overdueLabel: {
-    fontSize: 14,
-    color: '#D32F2F',
-    flex: 1,
-    fontWeight: '500',
-  },
-  overdueValue: {
-    fontSize: 14,
-    color: '#D32F2F',
-    fontWeight: 'bold',
-  },
-  upToDateInfo: {
-    backgroundColor: '#E8F5E8',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  upToDateLabel: {
-    fontSize: 14,
-    color: '#2E7D32',
-    fontWeight: '500',
-  },
-  upToDateValue: {
-    fontSize: 14,
-    color: '#2E7D32',
-    fontWeight: 'bold',
-    marginLeft: 'auto',
-  },
-  noPaymentsInfo: {
-    backgroundColor: '#FFF3E0',
-    padding: 12,
-    borderRadius: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  noPaymentsText: {
-    fontSize: 14,
-    color: '#F57C00',
-    fontWeight: '500',
-  },
-  basicPaymentInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingTop: 8,
-  },
-  paymentStat: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  paymentStatLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  paymentStatValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
-  },
-  quickStatsCard: {
-    margin: 16,
-    padding: 20,
-    elevation: 2,
-    backgroundColor: 'white',
-    borderRadius: 8,
-  },
-  quickStatsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 12,
-  },
-  quickStatItem: {
-    flex: 1,
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 2,
-    backgroundColor: 'white',
-  },
-  quickStatValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-  quickStatLabel: {
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
-    textAlign: 'center',
-    color: '#666',
-  },
-  filterContainer: {
-    marginBottom: 16,
-  },
-  segmentedButtons: {
-    marginVertical: 8,
-  },
-  resultCount: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-    fontStyle: 'italic',
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8,
-  },
-  statusChipContainer: {
-    alignItems: 'flex-start',
-    marginTop: 12,
-  },
-  seeAllContainer: {
-    alignItems: 'center',
-    marginTop: 16,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-  },
-  userNameHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  enhancedPaymentSection: {
-    backgroundColor: '#F8F9FA',
-    padding: 16,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  paymentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 16,
-  },
-  paymentInfoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  paymentInfoText: {
-    flex: 1,
-  },
-  paymentInfoLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
-  },
-  paymentInfoValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#000',
-  },
-});

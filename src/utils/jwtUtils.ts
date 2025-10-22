@@ -20,7 +20,7 @@ export const decodeJWTPayload = (token: string): JWTPayload | null => {
     // Add padding if needed
     const paddedPayload = payload + '='.repeat((4 - (payload.length % 4)) % 4);
     const decodedPayload = atob(paddedPayload);
-    
+
     return JSON.parse(decodedPayload) as JWTPayload;
   } catch (error) {
     console.error('Error decoding JWT:', error);
@@ -32,7 +32,7 @@ export const getUserVehicleIdFromToken = async (): Promise<number | null> => {
   try {
     const AsyncStorage = await import('@react-native-async-storage/async-storage');
     const token = await AsyncStorage.default.getItem('auth_token');
-    
+
     if (!token) {
       return null;
     }

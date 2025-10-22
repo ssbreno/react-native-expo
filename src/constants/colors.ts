@@ -6,15 +6,15 @@ export const Colors = {
   primary: '#4169E1', // Azul Royal
   primaryDark: '#2E4A9E', // Azul Royal escuro para variações
   primaryLight: '#5B7FE8', // Azul Royal claro para hover/states
-  
+
   // Cores secundárias
   secondary: '#000000', // Preto
   secondaryLight: '#1A1A1A', // Preto suave para variações
-  
+
   // Cores terciárias
   tertiary: '#FFFFFF', // Branco
   tertiaryDark: '#F5F5F5', // Branco acinzentado para backgrounds
-  
+
   // Cores de texto
   text: {
     primary: '#000000', // Texto principal (preto)
@@ -22,13 +22,13 @@ export const Colors = {
     tertiary: '#999999', // Texto terciário (cinza claro)
     onPrimary: '#FFFFFF', // Texto em fundo azul
   },
-  
+
   // Cores de status
   success: '#4CAF50', // Verde para sucesso
   warning: '#FF9800', // Laranja para avisos
   error: '#F44336', // Vermelho para erros
   info: '#2196F3', // Azul para informações
-  
+
   // Cores de background
   background: {
     primary: '#FFFFFF', // Background principal
@@ -36,14 +36,14 @@ export const Colors = {
     tertiary: '#FAFAFA', // Background terciário
     card: '#FFFFFF', // Background de cards
   },
-  
+
   // Cores de borda
   border: {
     light: '#E0E0E0',
     medium: '#BDBDBD',
     dark: '#757575',
   },
-  
+
   // Cores neutras
   gray: {
     100: '#F5F5F5',
@@ -56,7 +56,7 @@ export const Colors = {
     800: '#424242',
     900: '#212121',
   },
-  
+
   // Overlay e backdrop
   overlay: 'rgba(0, 0, 0, 0.5)',
   backdropLight: 'rgba(0, 0, 0, 0.3)',

@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  Modal, 
-  Alert, 
-  StyleSheet, 
-  ScrollView, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Modal,
+  Alert,
+  StyleSheet,
+  ScrollView,
   Clipboard,
-  ActivityIndicator 
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { paymentService, PixPaymentData } from '../services/paymentService';
@@ -22,7 +22,12 @@ interface PixPaymentProps {
   onPaymentComplete?: (paymentData: PixPaymentData) => void;
 }
 
-const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description, onPaymentComplete }) => {
+const PixPayment: React.FC<PixPaymentProps> = ({
+  paymentId,
+  amount,
+  description,
+  onPaymentComplete,
+}) => {
   const [pixData, setPixData] = useState<PixPaymentData | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -34,21 +39,21 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
     setProcessing(true);
     try {
       console.log('[PixPayment] Generating PIX QR code for payment:', paymentId);
-      
+
       // First try to get existing QR code
       let result = await paymentService.getPixQRCode(paymentId);
-      
+
       // If no existing QR code, generate new one
       if (!result.success) {
         console.log('[PixPayment] No existing QR code, generating new one');
         result = await paymentService.generatePixQRCode(paymentId);
       }
-      
+
       if (result.success && result.data) {
         console.log('[PixPayment] PIX QR code obtained successfully:', result.data);
         setPixData(result.data);
         setShowModal(true);
-        
+
         // Start status polling
         startStatusPolling();
       } else {
@@ -114,7 +119,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
-      currency: 'BRL'
+      currency: 'BRL',
     }).format(amount);
   };
 
@@ -125,7 +130,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
+      <TouchableOpacity
         onPress={handlePixPayment}
         disabled={processing}
         style={[styles.payButton, processing && styles.payButtonDisabled]}
@@ -135,9 +140,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
         ) : (
           <View style={styles.payButtonContent}>
             <Ionicons name="qr-code-outline" size={20} color="#fff" />
-            <Text style={styles.payButtonText}>
-              Pagar {formatCurrency(amount)} via PIX
-            </Text>
+            <Text style={styles.payButtonText}>Pagar {formatCurrency(amount)} via PIX</Text>
           </View>
         )}
       </TouchableOpacity>
@@ -151,10 +154,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
                   <Ionicons name="qr-code-outline" size={32} color={Colors.primary} />
                 </View>
                 <Text style={styles.modalTitle}>Pagamento PIX Gerado</Text>
-                <TouchableOpacity 
-                  onPress={closeModal}
-                  style={styles.closeButton}
-                >
+                <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
                   <Ionicons name="close" size={24} color="#666" />
                 </TouchableOpacity>
               </View>
@@ -173,10 +173,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
                   <Text style={styles.pixCode} numberOfLines={3}>
                     {pixData?.pix_copy_paste}
                   </Text>
-                  <TouchableOpacity 
-                    onPress={copyToClipboard}
-                    style={styles.copyButton}
-                  >
+                  <TouchableOpacity onPress={copyToClipboard} style={styles.copyButton}>
                     <Ionicons name="copy-outline" size={20} color={Colors.primary} />
                   </TouchableOpacity>
                 </View>
@@ -192,9 +189,7 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
                 </View>
                 <View style={styles.instruction}>
                   <Text style={styles.instructionNumber}>2.</Text>
-                  <Text style={styles.instructionText}>
-                    Escolha a opção PIX e "Copia e Cola"
-                  </Text>
+                  <Text style={styles.instructionText}>Escolha a opção PIX e "Copia e Cola"</Text>
                 </View>
                 <View style={styles.instruction}>
                   <Text style={styles.instructionNumber}>3.</Text>
@@ -210,24 +205,21 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
                   <Text style={styles.statusText}>Aguardando pagamento</Text>
                 </View>
                 <Text style={styles.expiresText}>
-                  Expira em: {pixData?.expires_at ? new Date(pixData.expires_at).toLocaleString('pt-BR') : 'N/A'}
+                  Expira em:{' '}
+                  {pixData?.expires_at
+                    ? new Date(pixData.expires_at).toLocaleString('pt-BR')
+                    : 'N/A'}
                 </Text>
               </View>
             </ScrollView>
 
             <View style={styles.modalActions}>
-              <TouchableOpacity 
-                onPress={copyToClipboard}
-                style={styles.copyActionButton}
-              >
+              <TouchableOpacity onPress={copyToClipboard} style={styles.copyActionButton}>
                 <Ionicons name="copy-outline" size={18} color={Colors.primary} />
                 <Text style={styles.copyActionText}>Copiar Código</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                onPress={closeModal}
-                style={styles.closeActionButton}
-              >
+
+              <TouchableOpacity onPress={closeModal} style={styles.closeActionButton}>
                 <Text style={styles.closeActionText}>Fechar</Text>
               </TouchableOpacity>
             </View>
@@ -239,38 +231,91 @@ const PixPayment: React.FC<PixPaymentProps> = ({ paymentId, amount, description,
 };
 
 const styles = StyleSheet.create({
+  amount: {
+    color: Colors.primary,
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  closeActionButton: {
+    alignItems: 'center',
+    backgroundColor: Colors.text.secondary,
+    borderRadius: 8,
+    flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  closeActionText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  closeButton: {
+    padding: 4,
+  },
   container: {
     marginVertical: 10,
   },
-  payButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  payButtonDisabled: {
-    backgroundColor: '#a8a8a8',
-  },
-  payButtonContent: {
-    flexDirection: 'row',
+  copyActionButton: {
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  payButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  modalOverlay: {
+    borderColor: Colors.primary,
+    borderRadius: 8,
+    borderWidth: 1,
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  copyActionText: {
+    color: Colors.primary,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  copyButton: {
+    marginLeft: 12,
+    padding: 4,
+  },
+  description: {
+    color: '#666',
+    fontSize: 14,
+  },
+  expiresText: {
+    color: '#666',
+    fontSize: 12,
+  },
+  headerIcon: {
+    marginRight: 12,
+  },
+  instruction: {
+    alignItems: 'flex-start',
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  instructionNumber: {
+    color: Colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
+    marginRight: 8,
+    minWidth: 20,
+  },
+  instructionText: {
+    color: '#666',
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  instructionsSection: {
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  modalActions: {
+    borderTopColor: '#f0f0f0',
+    borderTopWidth: 1,
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 20,
+    paddingTop: 20,
   },
   modalContent: {
     backgroundColor: '#fff',
@@ -280,158 +325,105 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   modalHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    borderBottomWidth: 1,
+    flexDirection: 'row',
+    padding: 20,
   },
-  headerIcon: {
-    marginRight: 12,
+  modalOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   modalTitle: {
+    color: '#333',
     flex: 1,
     fontSize: 20,
     fontWeight: '600',
-    color: '#333',
   },
-  closeButton: {
-    padding: 4,
+  payButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+    elevation: 2,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  payButtonContent: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  payButtonDisabled: {
+    backgroundColor: '#a8a8a8',
+  },
+  payButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   paymentInfo: {
     alignItems: 'center',
-    padding: 20,
     backgroundColor: '#f8f9fa',
-    marginHorizontal: 20,
     borderRadius: 12,
     marginBottom: 20,
-  },
-  vehicleName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 4,
-  },
-  amount: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.primary,
-    marginBottom: 4,
-  },
-  description: {
-    fontSize: 14,
-    color: '#666',
-  },
-  pixSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  pixCodeContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#f8f9fa',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
+    marginHorizontal: 20,
+    padding: 20,
   },
   pixCode: {
-    flex: 1,
-    fontSize: 12,
     color: '#495057',
-    fontFamily: 'monospace',
-  },
-  copyButton: {
-    marginLeft: 12,
-    padding: 4,
-  },
-  instructionsSection: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  instruction: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  instructionNumber: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.primary,
-    marginRight: 8,
-    minWidth: 20,
-  },
-  instructionText: {
     flex: 1,
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+    fontFamily: 'monospace',
+    fontSize: 12,
   },
-  statusSection: {
-    paddingHorizontal: 20,
+  pixCodeContainer: {
+    backgroundColor: '#f8f9fa',
+    borderColor: '#e9ecef',
+    borderRadius: 8,
+    borderWidth: 1,
+    flexDirection: 'row',
+    padding: 16,
+  },
+  pixSection: {
     marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
   },
   statusBadge: {
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff3cd',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
     alignSelf: 'flex-start',
+    backgroundColor: '#fff3cd',
+    borderRadius: 20,
+    flexDirection: 'row',
     marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  statusSection: {
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
   statusText: {
-    marginLeft: 6,
-    fontSize: 14,
     color: '#856404',
+    fontSize: 14,
     fontWeight: '500',
+    marginLeft: 6,
   },
-  expiresText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    gap: 12,
-  },
-  copyActionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    borderRadius: 8,
-    gap: 6,
-  },
-  copyActionText: {
-    color: Colors.primary,
+  vehicleName: {
+    color: '#333',
     fontSize: 16,
     fontWeight: '500',
-  },
-  closeActionButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    backgroundColor: Colors.text.secondary,
-    borderRadius: 8,
-  },
-  closeActionText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    marginBottom: 4,
   },
 });
 

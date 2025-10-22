@@ -2,30 +2,35 @@
   "expo": {
     "name": "Nanquim Locações",
     "slug": "vehicle-rental-app",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": [
-      "**/*"
+      "assets/images/**/*",
+      "assets/fonts/**/*",
+      "assets/*.png",
+      "assets/*.jpg"
     ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nanquim.locacoes",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "icon": "./assets/MASTER_1024.png",
+      "jsEngine": "hermes",
       "config": {
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
         "NSCameraUsageDescription": "Este app precisa acessar a câmera para escanear códigos QR de pagamento PIX.",
         "NSPhotoLibraryUsageDescription": "Este app precisa acessar a galeria para selecionar imagens de perfil.",
+        "NSUserNotificationsUsageDescription": "Este app envia notificações sobre lembretes de pagamento e status de pagamentos.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleDisplayName": "Nanquim Locações",
         "NSAppTransportSecurity": {
@@ -45,17 +50,20 @@
       }
     },
     "android": {
-      "icon": "./assets/Android/playstore-icon-512.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
       "package": "com.nanquim.locacoes",
-      "versionCode": 6,
-      "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE"
-      ]
+      "versionCode": 7,
+      "permissions": ["CAMERA", "READ_EXTERNAL_STORAGE"],
+      "useNextNotificationsApi": true,
+      "jsEngine": "hermes",
+      "enableProguardInReleaseBuilds": true,
+      "enableShrinkResourcesInReleaseBuilds": true,
+      "config": {
+        "usesCleartextTraffic": false
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -67,7 +75,7 @@
       "EXPO_PUBLIC_API_URL": "https://vehicles-go-production.up.railway.app/api/v1",
       "EXPO_PUBLIC_DEBUG": "true",
       "EXPO_PUBLIC_APP_NAME": "Vehicles Go",
-      "EXPO_PUBLIC_APP_VERSION": "1.0.6",
+      "EXPO_PUBLIC_APP_VERSION": "1.0.7",
       "EXPO_PUBLIC_API_TIMEOUT": "10000",
       "EXPO_PUBLIC_API_RETRY_ATTEMPTS": "3",
       "EXPO_PUBLIC_API_RETRY_DELAY": "1000",
@@ -80,7 +88,20 @@
       "EXPO_PUBLIC_LOG_LEVEL": "debug"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableShrinkResourcesInReleaseBuilds": true,
+            "enableProguardInReleaseBuilds": true,
+            "extraProguardRules": "-keep class com.facebook.hermes.unicode.** { *; }\n-keep class com.facebook.jni.** { *; }"
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
     ]
   }
 }

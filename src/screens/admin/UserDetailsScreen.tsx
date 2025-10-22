@@ -1,11 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  ScrollView,
-  Alert,
-  StyleSheet,
-  RefreshControl
-} from 'react-native';
+import { View, ScrollView, Alert, RefreshControl } from 'react-native';
 import {
   Card,
   Title,
@@ -18,14 +12,16 @@ import {
   Divider,
   Dialog,
   Portal,
-  TextInput as PaperTextInput
+  TextInput as PaperTextInput,
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { adminService, AdminUser } from '../../services/adminService';
 import { formatCurrency } from '../../utils/dateUtils';
 import { vehicleService } from '../../services/vehicleService';
-import { Vehicle } from '../../types';
+import { Vehicle, Payment } from '../../types';
 import { Colors } from '../../constants/colors';
+import { styles } from './UserDetailsScreen.styles';
+import PaymentReceipt from '../../components/PaymentReceipt';
 
 interface UserDetailsScreenProps {
   route: {
@@ -40,6 +36,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   const { userId } = route.params;
   const [user, setUser] = useState<AdminUser | null>(null);
   const [userVehicles, setUserVehicles] = useState<Vehicle[]>([]);
+  const [userPayments, setUserPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -47,7 +44,10 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   const [weeklyAmount, setWeeklyAmount] = useState('');
   const [monthlyAmount, setMonthlyAmount] = useState('');
   const [savingPayment, setSavingPayment] = useState(false);
-  
+  const [showReceipt, setShowReceipt] = useState<number | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+
   // Edit user info states
   const [editUserVisible, setEditUserVisible] = useState(false);
   const [editName, setEditName] = useState('');
@@ -55,6 +55,10 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [savingUser, setSavingUser] = useState(false);
+
+  // Delete user state
+  const [deleting, setDeleting] = useState(false);
+
   const theme = useTheme();
 
   useEffect(() => {
@@ -62,75 +66,78 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   }, [userId]);
 
   const loadUserDetails = async () => {
+    if (!userId) return;
+
     setLoading(true);
+    setLoadingPayments(true);
+
     try {
-      // Load user details and payment status in parallel
-      const [userResult, paymentStatusResult] = await Promise.all([
+      const [userResult, paymentStatusResult, paymentsResult] = await Promise.all([
         adminService.getUserDetails(userId),
-        adminService.getUsersWithPaymentStatus()
+        adminService.getUsersWithPaymentStatus(),
+        adminService.getUserPayments(userId),
       ]);
 
-      console.log('👤 User details result:', JSON.stringify(userResult, null, 2));
-      console.log('💰 Payment status result:', JSON.stringify(paymentStatusResult, null, 2));
-
       if (userResult.success && userResult.data) {
-        console.log('✅ Setting user data:', userResult.data);
-        console.log('📧 Email:', userResult.data.email);
-        console.log('📱 Phone:', userResult.data.phone);
-        console.log('📍 Address:', userResult.data.address);
-        console.log('💰 Weekly amount:', userResult.data.weekly_amount);
-        console.log('💵 Monthly amount:', userResult.data.monthly_amount);
-        console.log('🚗 Vehicles:', userResult.data.vehicles);
-        
         let userData = userResult.data;
-        
-        // Merge payment status data - try multiple comparison methods
+
+        // Merge payment status data
         if (paymentStatusResult.success && paymentStatusResult.data) {
-          console.log('🔍 Searching for user ID:', userId, 'Type:', typeof userId);
-          console.log('📋 Available users:', paymentStatusResult.data.map((u: AdminUser) => ({ id: u.id, type: typeof u.id })));
-          
-          // Try multiple matching strategies
-          const paymentData = paymentStatusResult.data.find((u: AdminUser) => {
-            const match1 = u.id.toString() === userId.toString();
-            const match2 = u.id === parseInt(userId);
-            const match3 = u.id.toString() === userId;
-            
-            console.log(`Comparing user ${u.id} with ${userId}: match1=${match1}, match2=${match2}, match3=${match3}`);
-            
-            return match1 || match2 || match3;
-          });
-          
+          const paymentData = paymentStatusResult.data.find(
+            (u: AdminUser) =>
+              u.id.toString() === userId.toString() ||
+              u.id === parseInt(userId) ||
+              u.id.toString() === userId
+          );
+
           if (paymentData) {
-            console.log('✅ Found payment data:', paymentData);
             userData = { ...userData, ...paymentData };
-            console.log('💳 Payment status merged:', userData.payment_status);
           } else {
-            console.log('⚠️ No payment data found for user ID:', userId);
-            // Set default if no payment data found
-            userData.payment_status = 'no_payments';
+            if (userData.total_payments && userData.total_payments > 0) {
+              userData.payment_status = userData.payment_status || 'up_to_date';
+            } else {
+              userData.payment_status = 'no_payments';
+            }
           }
         }
-        
+
         setUser(userData);
-        
-        // Set vehicles from user data if available
+
+        // Set vehicles
         if (userData.vehicles && Array.isArray(userData.vehicles)) {
-          console.log('🚙 Setting vehicles from user data:', userData.vehicles);
           setUserVehicles(userData.vehicles);
         } else {
-          console.log('⚠️ No vehicles found in user data');
           setUserVehicles([]);
         }
+
+        // Set user payments - try from API first, then from userData
+        let payments: Payment[] = [];
+
+        if (paymentsResult.success && paymentsResult.data) {
+          payments = paymentsResult.data.payments || paymentsResult.data || [];
+        }
+
+        // If API didn't return payments, try from user data
+        if (payments.length === 0 && userData.payments && Array.isArray(userData.payments)) {
+          payments = userData.payments;
+        }
+
+        // Filter only paid/completed payments
+        const paidPayments = payments.filter(
+          (p: Payment) => p.status === 'paid' || p.status === 'completed'
+        );
+
+        setUserPayments(paidPayments);
       } else {
         console.error('❌ User details error:', userResult.error);
         Alert.alert('Erro', userResult.error || 'Erro ao carregar dados do usuário');
       }
-
     } catch (error) {
       console.error('Erro ao carregar detalhes:', error);
       Alert.alert('Erro', 'Erro ao carregar dados do usuário');
     } finally {
       setLoading(false);
+      setLoadingPayments(false);
       setRefreshing(false);
     }
   };
@@ -145,7 +152,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
     try {
       const result = await adminService.updateUserStatus(userId, newStatus);
       if (result.success) {
-        setUser(prev => prev ? { ...prev, status: newStatus } : null);
+        setUser(prev => (prev ? { ...prev, status: newStatus } : null));
         Alert.alert('Sucesso', result.message || 'Status atualizado com sucesso');
       } else {
         Alert.alert('Erro', result.error || 'Erro ao atualizar status');
@@ -198,10 +205,10 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
       if (result.success) {
         setUser(prev => {
           if (!prev) return null;
-          return { 
-            ...prev, 
+          return {
+            ...prev,
             weekly_amount: weekly !== undefined ? weekly : prev.weekly_amount,
-            monthly_amount: monthly !== undefined ? monthly : prev.monthly_amount
+            monthly_amount: monthly !== undefined ? monthly : prev.monthly_amount,
           };
         });
         closeEditPaymentDialog();
@@ -244,78 +251,165 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
       return;
     }
 
+    console.log('💾 [UserDetails] Salvando informações do usuário:', {
+      userId,
+      name: editName,
+      email: editEmail,
+      phone: editPhone,
+      address: editAddress,
+    });
+
     setSavingUser(true);
     try {
       const result = await adminService.updateUserInfo(userId, {
         name: editName,
         email: editEmail,
         phone: editPhone,
-        address: editAddress
+        address: editAddress,
       });
-      
+
+      console.log('📊 [UserDetails] Resultado da atualização:', result);
+
       if (result.success) {
-        setUser(prev => prev ? {
-          ...prev,
-          name: editName,
-          email: editEmail,
-          phone: editPhone,
-          address: editAddress
-        } : null);
+        setUser(prev =>
+          prev
+            ? {
+                ...prev,
+                name: editName,
+                email: editEmail,
+                phone: editPhone,
+                address: editAddress,
+              }
+            : null
+        );
         closeEditUserDialog();
         Alert.alert('Sucesso', result.message || 'Informações atualizadas com sucesso');
       } else {
+        console.error('❌ [UserDetails] Erro na resposta:', result.error);
         Alert.alert('Erro', result.error || 'Erro ao atualizar informações');
       }
-    } catch (error) {
-      console.error('Erro ao atualizar:', error);
+    } catch (error: any) {
+      console.error('❌ [UserDetails] Exception ao atualizar:', error);
+      console.error('❌ [UserDetails] Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
       Alert.alert('Erro', 'Erro ao atualizar informações do usuário');
     } finally {
       setSavingUser(false);
     }
   };
 
+  const handleDeleteUser = () => {
+    Alert.alert(
+      'Deletar Usuário',
+      `Tem certeza que deseja deletar o usuário ${user?.name}?\n\nEsta ação não pode ser desfeita e irá remover:\n• Todos os dados do usuário\n• Histórico de pagamentos\n• Vínculos com veículos`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Deletar',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              console.log('🗑️ [UserDetails] Deletando usuário:', userId);
+              const result = await adminService.deleteUser(userId);
+
+              if (result.success) {
+                Alert.alert('Sucesso!', result.message || 'Usuário deletado com sucesso', [
+                  {
+                    text: 'OK',
+                    onPress: () => navigation.goBack(),
+                  },
+                ]);
+              } else {
+                console.error('❌ [UserDetails] Erro ao deletar:', result.error);
+                Alert.alert('Erro', result.error || 'Erro ao deletar usuário');
+              }
+            } catch (error: any) {
+              console.error('❌ [UserDetails] Exception ao deletar:', error);
+              Alert.alert('Erro', 'Erro ao deletar usuário');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case 'active': return '#4CAF50';
-      case 'inactive': return '#FF9800';
-      case 'suspended': return '#F44336';
-      default: return '#757575';
+      case 'active':
+        return '#4CAF50';
+      case 'inactive':
+        return '#FF9800';
+      case 'suspended':
+        return '#F44336';
+      default:
+        return '#757575';
     }
   };
 
   const getStatusText = (status?: string) => {
     switch (status) {
-      case 'active': return 'Ativo';
-      case 'inactive': return 'Inativo';
-      case 'suspended': return 'Suspenso';
-      default: return 'Desconhecido';
+      case 'active':
+        return 'Ativo';
+      case 'inactive':
+        return 'Inativo';
+      case 'suspended':
+        return 'Suspenso';
+      default:
+        return 'Desconhecido';
     }
   };
 
   const getPaymentStatusColor = (status?: string) => {
     switch (status) {
-      case 'up_to_date': return { bg: '#E8F5E8', text: '#2E7D32', icon: '#4CAF50' };
-      case 'overdue': return { bg: '#FFEBEE', text: '#D32F2F', icon: '#F44336' };
-      case 'no_payments': return { bg: '#FFF3E0', text: '#F57C00', icon: '#FF9800' };
-      default: return { bg: '#F5F5F5', text: '#757575', icon: '#757575' };
+      case 'up_to_date':
+        return { bg: '#E8F5E8', text: '#2E7D32', icon: '#4CAF50' };
+      case 'overdue':
+        return { bg: '#FFEBEE', text: '#D32F2F', icon: '#F44336' };
+      case 'no_payments':
+        return { bg: '#FFF3E0', text: '#F57C00', icon: '#FF9800' };
+      case 'pending':
+        return { bg: '#FFF9E6', text: '#F57C00', icon: '#FFC107' };
+      default:
+        return { bg: '#FFF3E0', text: '#F57C00', icon: '#FF9800' };
     }
   };
 
   const getPaymentStatusText = (status?: string) => {
     switch (status) {
-      case 'up_to_date': return 'Em Dia';
-      case 'overdue': return 'Vencido';
-      case 'no_payments': return 'Sem Pagamentos';
-      default: return 'Indefinido';
+      case 'up_to_date':
+        return 'Em Dia';
+      case 'overdue':
+        return 'Vencido';
+      case 'no_payments':
+        return 'Sem Pagamentos';
+      case 'pending':
+        return 'Aguardando Pagamento';
+      default:
+        return 'Sem Pagamentos';
     }
   };
 
   const getPaymentStatusIcon = (status?: string) => {
     switch (status) {
-      case 'up_to_date': return 'checkmark-circle';
-      case 'overdue': return 'alert-circle';
-      case 'no_payments': return 'information-circle';
-      default: return 'help-circle';
+      case 'up_to_date':
+        return 'checkmark-circle';
+      case 'overdue':
+        return 'alert-circle';
+      case 'no_payments':
+        return 'information-circle';
+      case 'pending':
+        return 'time';
+      default:
+        return 'information-circle';
     }
   };
 
@@ -353,9 +447,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   return (
     <ScrollView
       style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-      }
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
     >
       {/* User Info Card */}
       <Card style={styles.card}>
@@ -371,21 +463,21 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                 <Chip
                   mode="outlined"
                   textStyle={{ color: getStatusColor(user.status), fontSize: 12 }}
-                  style={{ 
+                  style={{
                     borderColor: getStatusColor(user.status),
-                    marginTop: 8 
+                    marginTop: 8,
                   }}
                 >
                   {getStatusText(user.status)}
                 </Chip>
-                {user.is_admin && (
+                {!!user.is_admin && (
                   <Chip
                     mode="flat"
                     textStyle={{ color: Colors.primary, fontSize: 12 }}
-                    style={{ 
+                    style={{
                       backgroundColor: '#E3F2FD',
                       marginTop: 8,
-                      marginLeft: 8
+                      marginLeft: 8,
                     }}
                   >
                     Administrador
@@ -402,12 +494,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
         <Card.Content>
           <View style={styles.sectionHeader}>
             <Title style={styles.sectionTitle}>Informações de Contato</Title>
-            <Button
-              mode="outlined"
-              onPress={openEditUserDialog}
-              icon="pencil"
-              compact
-            >
+            <Button mode="outlined" onPress={openEditUserDialog} icon="pencil" compact>
               Editar
             </Button>
           </View>
@@ -427,21 +514,18 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
           <View style={styles.infoItem}>
             <Ionicons name="card-outline" size={20} color="#666" />
             <Text style={styles.infoText}>
-              {user.document_type?.toUpperCase()}: {user.document_number || user.cpf || 'Não informado'}
+              {user.document_type?.toUpperCase()}:{' '}
+              {user.document_number || user.cpf || 'Não informado'}
             </Text>
           </View>
           <View style={styles.infoItem}>
             <Ionicons name="calendar-outline" size={20} color="#666" />
-            <Text style={styles.infoText}>
-              Criado em: {formatDateTime(user.created_at)}
-            </Text>
+            <Text style={styles.infoText}>Criado em: {formatDateTime(user.created_at)}</Text>
           </View>
-          {user.updated_at && (
+          {!!user.updated_at && (
             <View style={styles.infoItem}>
               <Ionicons name="sync-outline" size={20} color="#666" />
-              <Text style={styles.infoText}>
-                Atualizado: {formatDateTime(user.updated_at)}
-              </Text>
+              <Text style={styles.infoText}>Atualizado: {formatDateTime(user.updated_at)}</Text>
             </View>
           )}
         </Card.Content>
@@ -451,21 +535,31 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
       <Card style={styles.card}>
         <Card.Content>
           <Title style={styles.sectionTitle}>Status do Pagamento Atual</Title>
-          <View style={[styles.paymentStatusContainer, { backgroundColor: getPaymentStatusColor(user.payment_status).bg }]}>
+          <View
+            style={[
+              styles.paymentStatusContainer,
+              { backgroundColor: getPaymentStatusColor(user.payment_status).bg },
+            ]}
+          >
             <View style={styles.paymentStatusHeader}>
-              <Ionicons 
-                name={getPaymentStatusIcon(user.payment_status) as any} 
-                size={32} 
-                color={getPaymentStatusColor(user.payment_status).icon} 
+              <Ionicons
+                name={getPaymentStatusIcon(user.payment_status) as any}
+                size={32}
+                color={getPaymentStatusColor(user.payment_status).icon}
               />
               <View style={styles.paymentStatusInfo}>
                 <Text style={styles.paymentStatusLabel}>Status Atual</Text>
-                <Text style={[styles.paymentStatusValue, { color: getPaymentStatusColor(user.payment_status).text }]}>
+                <Text
+                  style={[
+                    styles.paymentStatusValue,
+                    { color: getPaymentStatusColor(user.payment_status).text },
+                  ]}
+                >
                   {getPaymentStatusText(user.payment_status)}
                 </Text>
               </View>
             </View>
-            
+
             {user.payment_status === 'overdue' && (
               <View style={styles.overdueDetails}>
                 <Divider style={{ marginVertical: 12, backgroundColor: '#FFCDD2' }} />
@@ -481,13 +575,15 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                     <Ionicons name="cash-outline" size={20} color="#D32F2F" />
                     <View>
                       <Text style={styles.overdueLabel}>Valor Pendente</Text>
-                      <Text style={styles.overdueValue}>{formatCurrency(user.pending_amount || 0)}</Text>
+                      <Text style={styles.overdueValue}>
+                        {formatCurrency(user.pending_amount || 0)}
+                      </Text>
                     </View>
                   </View>
                 </View>
               </View>
             )}
-            
+
             {user.payment_status === 'up_to_date' && user.last_payment && (
               <View style={styles.upToDateDetails}>
                 <Divider style={{ marginVertical: 12, backgroundColor: '#C8E6C9' }} />
@@ -528,36 +624,54 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
         <Card.Content>
           <View style={styles.sectionHeader}>
             <Title style={styles.sectionTitle}>Valores de Pagamento</Title>
-            <Button
-              mode="outlined"
-              onPress={openEditPaymentDialog}
-              icon="pencil"
-              compact
-            >
+            <Button mode="outlined" onPress={openEditPaymentDialog} icon="pencil" compact>
               Editar
             </Button>
           </View>
           <Divider style={{ marginVertical: 12 }} />
-          <View style={styles.paymentAmountsGrid}>
-            <Surface style={styles.amountCard}>
-              <Ionicons name="calendar-outline" size={32} color={theme.colors.primary} />
-              <Text style={styles.amountLabel}>Valor Semanal</Text>
-              <Text style={[styles.amountValue, { color: theme.colors.primary }]}>
-                {user.weekly_amount 
-                  ? `R$ ${user.weekly_amount.toFixed(2).replace('.', ',')}` 
-                  : 'Não definido'}
-              </Text>
-            </Surface>
-            <Surface style={styles.amountCard}>
-              <Ionicons name="calendar" size={32} color={theme.colors.primary} />
-              <Text style={styles.amountLabel}>Valor Mensal</Text>
-              <Text style={[styles.amountValue, { color: theme.colors.primary }]}>
-                {user.monthly_amount 
-                  ? `R$ ${user.monthly_amount.toFixed(2).replace('.', ',')}` 
-                  : 'Não definido'}
-              </Text>
-            </Surface>
-          </View>
+          {/* Se tem valor semanal definido, mostra apenas o valor semanal */}
+          {user.weekly_amount !== undefined &&
+          user.weekly_amount !== null &&
+          user.weekly_amount > 0 ? (
+            <View style={styles.paymentAmountsGrid}>
+              <Surface style={[styles.amountCard, { flex: 1 }]}>
+                <Ionicons name="calendar-outline" size={32} color={theme.colors.primary} />
+                <Text style={styles.amountLabel}>Valor Semanal</Text>
+                <Text style={[styles.amountValue, { color: theme.colors.primary }]}>
+                  R$ {user.weekly_amount.toFixed(2).replace('.', ',')}
+                </Text>
+              </Surface>
+            </View>
+          ) : user.monthly_amount !== undefined &&
+            user.monthly_amount !== null &&
+            user.monthly_amount > 0 ? (
+            <View style={styles.paymentAmountsGrid}>
+              <Surface style={[styles.amountCard, { flex: 1 }]}>
+                <Ionicons name="calendar" size={32} color={theme.colors.primary} />
+                <Text style={styles.amountLabel}>Valor Mensal</Text>
+                <Text style={[styles.amountValue, { color: theme.colors.primary }]}>
+                  R$ {user.monthly_amount.toFixed(2).replace('.', ',')}
+                </Text>
+              </Surface>
+            </View>
+          ) : (
+            <View style={styles.paymentAmountsGrid}>
+              <Surface style={styles.amountCard}>
+                <Ionicons name="calendar-outline" size={32} color={theme.colors.primary} />
+                <Text style={styles.amountLabel}>Valor Semanal</Text>
+                <Text style={[styles.amountValue, { color: theme.colors.primary }]}>
+                  Não definido
+                </Text>
+              </Surface>
+              <Surface style={styles.amountCard}>
+                <Ionicons name="calendar" size={32} color={theme.colors.primary} />
+                <Text style={styles.amountLabel}>Valor Mensal</Text>
+                <Text style={[styles.amountValue, { color: theme.colors.primary }]}>
+                  Não definido
+                </Text>
+              </Surface>
+            </View>
+          )}
         </Card.Content>
       </Card>
 
@@ -566,7 +680,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
         <Card.Content>
           <Title style={styles.sectionTitle}>Veículos do Usuário</Title>
           {userVehicles.length > 0 ? (
-            userVehicles.map((vehicle) => (
+            userVehicles.map(vehicle => (
               <View key={vehicle.id} style={styles.vehicleItem}>
                 <View style={styles.vehicleHeader}>
                   <Ionicons name="car" size={28} color={theme.colors.primary} />
@@ -582,17 +696,21 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                     mode="outlined"
                     style={{
                       backgroundColor: getStatusColor(vehicle.status) + '20',
-                      borderColor: getStatusColor(vehicle.status)
+                      borderColor: getStatusColor(vehicle.status),
                     }}
-                    textStyle={{ 
+                    textStyle={{
                       color: getStatusColor(vehicle.status),
                       fontSize: 11,
-                      fontWeight: '600'
+                      fontWeight: '600',
                     }}
                   >
-                    {vehicle.status === 'available' ? 'Disponível' : 
-                     vehicle.status === 'rented' ? 'Alugado' : 
-                     vehicle.status === 'maintenance' ? 'Manutenção' : vehicle.status}
+                    {vehicle.status === 'available'
+                      ? 'Disponível'
+                      : vehicle.status === 'rented'
+                        ? 'Alugado'
+                        : vehicle.status === 'maintenance'
+                          ? 'Manutenção'
+                          : vehicle.status || 'N/A'}
                   </Chip>
                 </View>
 
@@ -603,7 +721,8 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                     <Ionicons name="calendar-outline" size={16} color="#666" />
                     <Text style={styles.vehicleDetailLabel}>Ano:</Text>
                     <Text style={styles.vehicleDetailValue}>
-                      {vehicle.manufacture_year || vehicle.year}/{vehicle.model_year || vehicle.year}
+                      {vehicle.manufacture_year || vehicle.year}/
+                      {vehicle.model_year || vehicle.year}
                     </Text>
                   </View>
 
@@ -613,7 +732,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                     <Text style={styles.vehicleDetailValue}>{vehicle.color || 'N/A'}</Text>
                   </View>
 
-                  {vehicle.chassis && (
+                  {!!vehicle.chassis && (
                     <View style={styles.vehicleDetailRow}>
                       <Ionicons name="barcode-outline" size={16} color="#666" />
                       <Text style={styles.vehicleDetailLabel}>Chassi:</Text>
@@ -621,46 +740,65 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                     </View>
                   )}
 
-                  {vehicle.fuel_type && (
+                  {!!vehicle.fuel_type && (
                     <View style={styles.vehicleDetailRow}>
                       <Ionicons name="water-outline" size={16} color="#666" />
                       <Text style={styles.vehicleDetailLabel}>Combustível:</Text>
                       <Text style={styles.vehicleDetailValue}>
-                        {vehicle.fuel_type === 'gasoline' ? 'Gasolina' :
-                         vehicle.fuel_type === 'ethanol' ? 'Etanol' :
-                         vehicle.fuel_type === 'flex' ? 'Flex' :
-                         vehicle.fuel_type === 'diesel' ? 'Diesel' : vehicle.fuel_type}
+                        {vehicle.fuel_type === 'gasoline'
+                          ? 'Gasolina'
+                          : vehicle.fuel_type === 'ethanol'
+                            ? 'Etanol'
+                            : vehicle.fuel_type === 'flex'
+                              ? 'Flex'
+                              : vehicle.fuel_type === 'diesel'
+                                ? 'Diesel'
+                                : vehicle.fuel_type}
                       </Text>
                     </View>
                   )}
 
-                  {vehicle.price && (
+                  {vehicle.price !== undefined && vehicle.price !== null && (
                     <View style={styles.vehicleDetailRow}>
                       <Ionicons name="cash-outline" size={16} color="#666" />
                       <Text style={styles.vehicleDetailLabel}>Valor:</Text>
-                      <Text style={[styles.vehicleDetailValue, { color: theme.colors.primary, fontWeight: '600' }]}>
+                      <Text
+                        style={[
+                          styles.vehicleDetailValue,
+                          { color: theme.colors.primary, fontWeight: '600' },
+                        ]}
+                      >
                         R$ {vehicle.price.toFixed(2).replace('.', ',')}
                       </Text>
                     </View>
                   )}
 
-                  {vehicle.description && (
+                  {!!vehicle.description && (
                     <View style={[styles.vehicleDetailRow, { marginTop: 8 }]}>
                       <Ionicons name="information-circle-outline" size={16} color="#666" />
                       <Text style={styles.vehicleDetailLabel}>Descrição:</Text>
-                      <Text style={[styles.vehicleDetailValue, { flex: 1 }]}>{vehicle.description}</Text>
+                      <Text style={[styles.vehicleDetailValue, { flex: 1 }]}>
+                        {vehicle.description}
+                      </Text>
                     </View>
                   )}
                 </View>
 
-                {vehicle.rentalExpiration && (
-                  <View style={{ marginTop: 12, padding: 8, backgroundColor: '#FFF3E0', borderRadius: 6 }}>
+                {!!vehicle.rentalExpiration && (
+                  <View
+                    style={{
+                      marginTop: 12,
+                      padding: 8,
+                      backgroundColor: '#FFF3E0',
+                      borderRadius: 6,
+                    }}
+                  >
                     <Text style={{ fontSize: 12, color: '#F57C00' }}>
                       ⏰ Vencimento do aluguel: {formatDate(vehicle.rentalExpiration)}
                     </Text>
                   </View>
                 )}
-                
+
                 {userVehicles.length > 1 && <Divider style={styles.vehicleDivider} />}
               </View>
             ))
@@ -673,6 +811,119 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
         </Card.Content>
       </Card>
 
+      {/* User Payments History */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title style={styles.sectionTitle}>Histórico de Pagamentos</Title>
+          {loadingPayments ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            </View>
+          ) : userPayments.length > 0 ? (
+            userPayments.map((payment: Payment, index: number) => {
+              const isCompleted = payment.status === 'paid' || payment.status === 'completed';
+              const isPending = payment.status === 'pending';
+              const isOverdue = payment.status === 'overdue';
+
+              const statusColor = isCompleted ? '#4CAF50' : isOverdue ? '#F44336' : '#FF9800';
+              const statusBg = isCompleted ? '#E8F5E8' : isOverdue ? '#FFEBEE' : '#FFF3E0';
+              const statusText = isCompleted ? 'Pago' : isOverdue ? 'Vencido' : 'Pendente';
+
+              return (
+                <View key={payment.id || index}>
+                  <View style={styles.paymentItem}>
+                    <View style={styles.paymentHeader}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.paymentDescription}>
+                          {payment.description || 'Pagamento'}
+                        </Text>
+                        <Text style={styles.paymentDate}>
+                          Vencimento: {formatDate(payment.dueDate || payment.due_date)}
+                        </Text>
+                        {!!payment.date && (
+                          <Text style={[styles.paymentDate, { color: '#4CAF50' }]}>
+                            Pago em: {formatDateTime(payment.date)}
+                          </Text>
+                        )}
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.paymentAmount, { color: theme.colors.primary }]}>
+                          {formatCurrency(payment.amount)}
+                        </Text>
+                        <Chip
+                          mode="flat"
+                          style={{ backgroundColor: statusBg, marginTop: 4 }}
+                          textStyle={{ color: statusColor, fontSize: 11 }}
+                        >
+                          {statusText}
+                        </Chip>
+                      </View>
+                    </View>
+
+                    {/* Receipt Button - Only for paid payments */}
+                    {!!isCompleted && (
+                      <Button
+                        mode="outlined"
+                        onPress={() => {
+                          const paymentIdNum = parseInt(payment.id.toString());
+                          setSelectedPayment(payment);
+                          setShowReceipt(paymentIdNum);
+                        }}
+                        style={{ marginTop: 12 }}
+                        icon="receipt"
+                        compact
+                      >
+                        Ver Comprovante
+                      </Button>
+                    )}
+                  </View>
+                  {index < userPayments.length - 1 && <Divider style={{ marginVertical: 12 }} />}
+                </View>
+              );
+            })
+          ) : (
+            <View style={styles.noVehicles}>
+              <Ionicons name="cash-outline" size={48} color="#ccc" />
+              <Text style={styles.noVehiclesText}>Nenhum pagamento encontrado</Text>
+            </View>
+          )}
+        </Card.Content>
+      </Card>
+
+      {/* Danger Zone - Deletar Usuário */}
+      <Card style={[styles.card, { borderColor: '#F44336', borderWidth: 1 }]}>
+        <Card.Content>
+          <View style={styles.sectionHeader}>
+            <Title style={[styles.sectionTitle, { color: '#F44336' }]}>Zona de Perigo</Title>
+            <Ionicons name="warning" size={24} color="#F44336" />
+          </View>
+          <Text style={{ fontSize: 14, color: '#666', marginBottom: 16, marginTop: 8 }}>
+            Esta ação é irreversível. Ao deletar o usuário, todos os seus dados, histórico de
+            pagamentos e vínculos serão permanentemente removidos.
+          </Text>
+          <Button
+            mode="contained"
+            onPress={handleDeleteUser}
+            icon="trash-can-outline"
+            style={{ backgroundColor: '#F44336' }}
+            disabled={deleting}
+            loading={deleting}
+          >
+            {deleting ? 'Deletando...' : 'Deletar Usuário'}
+          </Button>
+        </Card.Content>
+      </Card>
+
+      {/* Payment Receipt Modal */}
+      <PaymentReceipt
+        visible={showReceipt !== null}
+        onDismiss={() => {
+          setShowReceipt(null);
+          setSelectedPayment(null);
+        }}
+        paymentId={showReceipt || 0}
+        paymentData={selectedPayment}
+      />
 
       {/* Edit Payment Dialog */}
       <Portal>
@@ -706,11 +957,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
             <Button onPress={closeEditPaymentDialog} disabled={savingPayment}>
               Cancelar
             </Button>
-            <Button 
-              onPress={savePaymentAmounts} 
-              disabled={savingPayment}
-              loading={savingPayment}
-            >
+            <Button onPress={savePaymentAmounts} disabled={savingPayment} loading={savingPayment}>
               Salvar
             </Button>
           </Dialog.Actions>
@@ -760,11 +1007,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
             <Button onPress={closeEditUserDialog} disabled={savingUser}>
               Cancelar
             </Button>
-            <Button 
-              onPress={saveUserInfo} 
-              disabled={savingUser}
-              loading={savingUser}
-            >
+            <Button onPress={saveUserInfo} disabled={savingUser} loading={savingUser}>
               Salvar
             </Button>
           </Dialog.Actions>
@@ -773,254 +1016,3 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    color: '#666',
-    marginVertical: 16,
-  },
-  card: {
-    marginBottom: 16,
-    elevation: 2,
-  },
-  userHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  avatarContainer: {
-    marginRight: 16,
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 4,
-  },
-  userEmail: {
-    fontSize: 16,
-    color: '#666',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 16,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  infoText: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 12,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  vehicleItem: {
-    marginBottom: 16,
-  },
-  vehicleHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  vehicleName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#000',
-    marginLeft: 8,
-  },
-  vehicleDetail: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-    marginLeft: 32,
-  },
-  vehicleDivider: {
-    marginTop: 12,
-  },
-  noVehicles: {
-    alignItems: 'center',
-    padding: 32,
-  },
-  noVehiclesText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 8,
-  },
-  actionButtons: {
-    gap: 12,
-  },
-  actionButton: {
-    marginVertical: 4,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  paymentAmountsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    gap: 16,
-  },
-  amountCard: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    elevation: 2,
-    backgroundColor: 'white',
-  },
-  amountLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  amountValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  vehiclePlate: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-  vehicleDetailsGrid: {
-    gap: 8,
-  },
-  vehicleDetailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  vehicleDetailLabel: {
-    fontSize: 13,
-    color: '#666',
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  vehicleDetailValue: {
-    fontSize: 13,
-    color: '#333',
-    fontWeight: '400',
-  },
-  paymentStatusContainer: {
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  paymentStatusHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  paymentStatusInfo: {
-    flex: 1,
-  },
-  paymentStatusLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  paymentStatusValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  overdueDetails: {
-    marginTop: 8,
-  },
-  overdueRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  overdueItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  overdueLabel: {
-    fontSize: 12,
-    color: '#D32F2F',
-    marginBottom: 4,
-  },
-  overdueValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#D32F2F',
-  },
-  upToDateDetails: {
-    marginTop: 8,
-  },
-  upToDateRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  upToDateLabel: {
-    fontSize: 12,
-    color: '#4CAF50',
-    marginBottom: 4,
-  },
-  upToDateValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-});

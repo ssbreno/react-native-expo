@@ -9,6 +9,7 @@ A Nanquim Locações ("nós", "nosso" ou "empresa") respeita sua privacidade e e
 ## 2. Informações que Coletamos
 
 ### 2.1 Informações Pessoais
+
 - Nome completo
 - Endereço de e-mail
 - Número de telefone
@@ -17,11 +18,13 @@ A Nanquim Locações ("nós", "nosso" ou "empresa") respeita sua privacidade e e
 - Data de nascimento
 
 ### 2.2 Informações de Pagamento
+
 - Dados de transações PIX
 - Histórico de pagamentos
 - Status de pagamentos
 
 ### 2.3 Informações do Dispositivo
+
 - Identificador único do dispositivo
 - Sistema operacional
 - Versão do aplicativo
@@ -30,6 +33,7 @@ A Nanquim Locações ("nós", "nosso" ou "empresa") respeita sua privacidade e e
 ## 3. Como Usamos suas Informações
 
 Utilizamos suas informações para:
+
 - Processar locações de veículos
 - Gerenciar pagamentos e cobranças
 - Enviar notificações importantes sobre pagamentos
@@ -39,10 +43,13 @@ Utilizamos suas informações para:
 ## 4. Compartilhamento de Informações
 
 ### 4.1 Não Compartilhamos com Terceiros
+
 Não vendemos, alugamos ou compartilhamos suas informações pessoais com terceiros para fins comerciais.
 
 ### 4.2 Exceções
+
 Podemos compartilhar informações apenas quando:
+
 - Exigido por lei ou ordem judicial
 - Necessário para proteger nossos direitos legais
 - Com seu consentimento explícito
@@ -50,12 +57,14 @@ Podemos compartilhar informações apenas quando:
 ## 5. Segurança dos Dados
 
 ### 5.1 Medidas de Segurança
+
 - Criptografia de dados em trânsito e em repouso
 - Acesso restrito a informações pessoais
 - Monitoramento regular de segurança
 - Backups seguros
 
 ### 5.2 Pagamentos PIX
+
 - Utilizamos provedores de pagamento certificados
 - Não armazenamos dados sensíveis de cartão
 - Transações protegidas por SSL/TLS
@@ -63,6 +72,7 @@ Podemos compartilhar informações apenas quando:
 ## 6. Seus Direitos
 
 Você tem o direito de:
+
 - Acessar suas informações pessoais
 - Corrigir informações incorretas
 - Solicitar exclusão de dados
@@ -72,6 +82,7 @@ Você tem o direito de:
 ## 7. Retenção de Dados
 
 Mantemos suas informações apenas pelo tempo necessário para:
+
 - Cumprir obrigações legais
 - Resolver disputas
 - Melhorar nossos serviços
@@ -79,6 +90,7 @@ Mantemos suas informações apenas pelo tempo necessário para:
 ## 8. Cookies e Tecnologias Similares
 
 Nosso aplicativo pode usar:
+
 - Cookies de sessão
 - Tokens de autenticação
 - Dados de cache local
@@ -98,6 +110,7 @@ Para questões sobre privacidade, entre em contato:
 ## 11. Conformidade Legal
 
 Esta política está em conformidade com:
+
 - Lei Geral de Proteção de Dados (LGPD)
 - Marco Civil da Internet
 - Código de Defesa do Consumidor
