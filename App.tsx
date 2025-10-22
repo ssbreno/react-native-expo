@@ -182,6 +182,14 @@ function AppNavigator() {
               headerBackTitle: 'Voltar',
             }}
           />
+          <Stack.Screen
+            name="VehiclesManagement"
+            component={require('./src/screens/admin/VehiclesManagementScreen').default}
+            options={{
+              title: 'Gerenciar Veículos',
+              headerBackTitle: 'Voltar',
+            }}
+          />
         </>
       ) : (
         // Regular User Navigation

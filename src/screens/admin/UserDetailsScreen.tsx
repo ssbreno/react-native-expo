@@ -808,6 +808,15 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
               <Text style={styles.noVehiclesText}>Nenhum veículo encontrado</Text>
             </View>
           )}
+
+          <Button
+            mode="outlined"
+            onPress={() => navigation.navigate('VehiclesManagement')}
+            icon="link-variant"
+            style={{ marginTop: 16 }}
+          >
+            Gerenciar Veículos
+          </Button>
         </Card.Content>
       </Card>
 

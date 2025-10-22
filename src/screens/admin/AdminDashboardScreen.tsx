@@ -786,6 +786,15 @@ export default function AdminDashboardScreen({ navigation }: AdminDashboardScree
           Atualizar Pagamentos Vencidos
         </Button>
 
+        <Button
+          mode="outlined"
+          onPress={() => navigation.navigate('VehiclesManagement')}
+          style={styles.actionButton}
+          icon="car-outline"
+        >
+          Gerenciar Veículos
+        </Button>
+
         {/* NOTIFICAÇÕES PUSH - DESABILITADAS TEMPORARIAMENTE
         Para reativar:
         1. Descomentar os botões abaixo

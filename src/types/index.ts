@@ -217,6 +217,7 @@ export type RootStackParamList = {
   UsersList: undefined;
   UserDetails: { userId: string };
   UpdateOverduePayments: undefined;
+  VehiclesManagement: undefined;
   VehicleDetail: { vehicleId: number };
   VehicleEdit: { vehicleId: number };
   ChangePassword: undefined;
