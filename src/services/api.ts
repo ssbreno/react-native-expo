@@ -12,6 +12,7 @@ const api = axios.create({
 let isRefreshing = false;
 let failedQueue: any[] = [];
 let lastTokenClearTime = 0;
+let isLoggingOut = false; // Flag to indicate if logout is in progress
 const TOKEN_CLEAR_COOLDOWN = 5000; // 5 seconds cooldown
 
 const processQueue = (error: any, token: string | null = null) => {
@@ -42,6 +43,13 @@ api.interceptors.response.use(
 
     // Only try to refresh token on 401 errors
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't try to refresh if logout is in progress
+      if (isLoggingOut) {
+        console.log('⚠️ [API] Logout em progresso, ignorando renovação de token');
+        error.isTokenExpired = true;
+        return Promise.reject(error);
+      }
+
       // Check if we recently cleared tokens - if so, don't retry
       const now = Date.now();
       if (now - lastTokenClearTime < TOKEN_CLEAR_COOLDOWN) {
@@ -126,6 +134,23 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// Export functions to control logout state
+export const setLoggingOut = (value: boolean) => {
+  isLoggingOut = value;
+  if (value) {
+    // Clear refresh flags when starting logout
+    isRefreshing = false;
+    failedQueue = [];
+  }
+};
+
+export const resetApiState = () => {
+  isRefreshing = false;
+  isLoggingOut = false;
+  failedQueue = [];
+  lastTokenClearTime = 0;
+};
 
 export { API_CONFIG };
 

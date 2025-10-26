@@ -160,14 +160,35 @@ export const paymentService = {
     }
   },
 
-  async getPaymentHistory(paymentId?: string): Promise<ApiResponse<PaymentHistory[]>> {
+  async getPaymentHistory(
+    paymentId?: string, 
+    page: number = 1, 
+    limit: number = 10
+  ): Promise<ApiResponse<{
+    payment_id?: number;
+    history: PaymentHistory[];
+    total: number;
+    page: number;
+    limit: number;
+  }>> {
     try {
       const url = paymentId ? `/payments/${paymentId}/history` : '/payments/history';
-      const response = await api.get(url);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString(),
+      });
+      
+      const response = await api.get(`${url}?${params}`);
 
       return {
         success: true,
-        data: response.data.history || response.data,
+        data: {
+          payment_id: response.data.payment_id,
+          history: response.data.history || response.data,
+          total: response.data.total || 0,
+          page: response.data.page || page,
+          limit: response.data.limit || limit,
+        },
       };
     } catch (error: any) {
       return {
@@ -224,6 +245,26 @@ export const paymentService = {
       return {
         success: false,
         error: error.response?.data?.error || 'Erro ao obter pagamentos do veículo',
+      };
+    }
+  },
+
+  async markPaymentAsPaid(paymentId: string): Promise<ApiResponse<any>> {
+    try {
+      console.log(`💳 [PaymentService] Marking payment ${paymentId} as paid`);
+      const response = await api.post(`/payments/${paymentId}/complete`);
+      
+      console.log('✅ [PaymentService] Payment marked as paid successfully');
+      return {
+        success: true,
+        data: response.data,
+        message: response.data.message || 'Pagamento marcado como pago com sucesso',
+      };
+    } catch (error: any) {
+      console.error('❌ [PaymentService] Error marking payment as paid:', error.response?.data);
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Erro ao marcar pagamento como pago',
       };
     }
   },

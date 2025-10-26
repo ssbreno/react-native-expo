@@ -597,4 +597,11 @@ export const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  overdueVehicleCard: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#F44336',
+  },
 });

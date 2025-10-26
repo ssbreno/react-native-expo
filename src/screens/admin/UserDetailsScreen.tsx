@@ -16,7 +16,8 @@ import {
 } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
 import { adminService, AdminUser } from '../../services/adminService';
-import { formatCurrency } from '../../utils/dateUtils';
+import { paymentService, PaymentHistory } from '../../services/paymentService';
+import { formatCurrency, formatDateTime } from '../../utils/dateUtils';
 import { vehicleService } from '../../services/vehicleService';
 import { Vehicle, Payment } from '../../types';
 import { Colors } from '../../constants/colors';
@@ -47,6 +48,14 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   const [showReceipt, setShowReceipt] = useState<number | null>(null);
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  
+  // Histórico de Pagamentos com paginação
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotal, setHistoryTotal] = useState(0);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const historyLimit = 10;
 
   // Edit user info states
   const [editUserVisible, setEditUserVisible] = useState(false);
@@ -54,6 +63,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editCpf, setEditCpf] = useState('');
   const [savingUser, setSavingUser] = useState(false);
 
   // Delete user state
@@ -64,6 +74,12 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
   useEffect(() => {
     loadUserDetails();
   }, [userId]);
+  
+  useEffect(() => {
+    if (user) {
+      loadPaymentHistory();
+    }
+  }, [historyPage, user]);
 
   const loadUserDetails = async () => {
     if (!userId) return;
@@ -140,6 +156,101 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
       setLoadingPayments(false);
       setRefreshing(false);
     }
+  };
+  
+  const loadPaymentHistory = async () => {
+    if (!user) return;
+    
+    setLoadingHistory(true);
+    try {
+      // Buscar histórico de TODOS os pagamentos do usuário
+      console.log(`📋 [UserDetails] Carregando histórico de ${userPayments.length} pagamentos`);
+      
+      if (userPayments.length === 0) {
+        console.log('⚠️ [UserDetails] Sem pagamentos para buscar histórico');
+        setPaymentHistory([]);
+        setHistoryTotal(0);
+        setHistoryTotalPages(1);
+        setLoadingHistory(false);
+        return;
+      }
+      
+      // Buscar histórico de cada pagamento
+      const historyPromises = userPayments.map(payment =>
+        paymentService.getPaymentHistory(
+          payment.id.toString(),
+          1, // Sempre primeira página de cada
+          100 // Pegar mais registros para consolidar
+        )
+      );
+      
+      const results = await Promise.all(historyPromises);
+      
+      // Consolidar todos os históricos
+      let allHistory: PaymentHistory[] = [];
+      results.forEach(result => {
+        if (result.success && result.data?.history) {
+          allHistory = [...allHistory, ...result.data.history];
+        }
+      });
+      
+      // Ordenar por data (mais recente primeiro)
+      allHistory.sort((a, b) => {
+        const dateA = new Date(a.created_at).getTime();
+        const dateB = new Date(b.created_at).getTime();
+        return dateB - dateA;
+      });
+      
+      // Aplicar paginação local
+      const startIdx = (historyPage - 1) * historyLimit;
+      const endIdx = startIdx + historyLimit;
+      const paginatedHistory = allHistory.slice(startIdx, endIdx);
+      
+      setPaymentHistory(paginatedHistory);
+      setHistoryTotal(allHistory.length);
+      setHistoryTotalPages(Math.ceil(allHistory.length / historyLimit));
+      
+      console.log(`📋 [UserDetails] Histórico consolidado: ${allHistory.length} registros totais, exibindo ${paginatedHistory.length}`);
+    } catch (error) {
+      console.error('❌ [UserDetails] Erro ao carregar histórico:', error);
+      setPaymentHistory([]);
+      setHistoryTotal(0);
+      setHistoryTotalPages(1);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+  
+  const handleMarkHistoryAsPaid = async (paymentId: string) => {
+    Alert.alert(
+      'Confirmar Ação',
+      'Deseja marcar este pagamento como PAGO?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Marcar como Pago',
+          style: 'default',
+          onPress: async () => {
+            try {
+              console.log(`💳 [UserDetails] Marcando pagamento ${paymentId} como pago`);
+              const result = await paymentService.markPaymentAsPaid(paymentId);
+              
+              if (result.success) {
+                Alert.alert('Sucesso!', result.message || 'Pagamento marcado como pago');
+                // Recarregar histórico e lista de pagamentos
+                await loadUserDetails();
+                await loadPaymentHistory();
+              } else {
+                Alert.alert('Erro', result.error || 'Erro ao marcar pagamento como pago');
+              }
+            } catch (error) {
+              console.error('❌ [UserDetails] Erro ao marcar pagamento:', error);
+              Alert.alert('Erro', 'Erro ao marcar pagamento como pago');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleRefresh = () => {
@@ -229,6 +340,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
     setEditEmail(user?.email || '');
     setEditPhone(user?.phone || '');
     setEditAddress(user?.address || '');
+    setEditCpf(user?.document_number || '');
     setEditUserVisible(true);
   };
 
@@ -238,6 +350,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
     setEditEmail('');
     setEditPhone('');
     setEditAddress('');
+    setEditCpf('');
   };
 
   const saveUserInfo = async () => {
@@ -257,6 +370,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
       email: editEmail,
       phone: editPhone,
       address: editAddress,
+      document_number: editCpf,
     });
 
     setSavingUser(true);
@@ -266,6 +380,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
         email: editEmail,
         phone: editPhone,
         address: editAddress,
+        document_number: editCpf,
       });
 
       console.log('📊 [UserDetails] Resultado da atualização:', result);
@@ -279,6 +394,7 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                 email: editEmail,
                 phone: editPhone,
                 address: editAddress,
+                document_number: editCpf,
               }
             : null
         );
@@ -299,6 +415,41 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
     } finally {
       setSavingUser(false);
     }
+  };
+
+  const handleMarkAsPaid = (payment: Payment) => {
+    Alert.alert(
+      'Marcar como Pago',
+      `Tem certeza que deseja marcar este pagamento como pago?\n\nValor: ${formatCurrency(payment.amount)}\nVencimento: ${formatDate(payment.dueDate || payment.due_date)}`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Marcar como Pago',
+          style: 'default',
+          onPress: async () => {
+            try {
+              console.log('💳 [UserDetails] Marking payment as paid:', payment.id);
+              const result = await adminService.completePayment(payment.id);
+
+              if (result.success) {
+                Alert.alert('Sucesso!', result.message || 'Pagamento marcado como pago');
+                // Reload user details to refresh payment status
+                await loadUserDetails();
+              } else {
+                console.error('❌ [UserDetails] Erro ao marcar pagamento:', result.error);
+                Alert.alert('Erro', result.error || 'Erro ao marcar pagamento como pago');
+              }
+            } catch (error: any) {
+              console.error('❌ [UserDetails] Error marking payment as paid:', error);
+              Alert.alert('Erro', 'Erro ao marcar pagamento como pago');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleDeleteUser = () => {
@@ -459,31 +610,20 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
             <View style={styles.userInfo}>
               <Title style={styles.userName}>{user.name}</Title>
               <Text style={styles.userEmail}>{user.email}</Text>
-              <View style={styles.statusContainer}>
-                <Chip
-                  mode="outlined"
-                  textStyle={{ color: getStatusColor(user.status), fontSize: 12 }}
-                  style={{
-                    borderColor: getStatusColor(user.status),
-                    marginTop: 8,
-                  }}
-                >
-                  {getStatusText(user.status)}
-                </Chip>
-                {!!user.is_admin && (
+              {!!user.is_admin && (
+                <View style={styles.statusContainer}>
                   <Chip
                     mode="flat"
                     textStyle={{ color: Colors.primary, fontSize: 12 }}
                     style={{
                       backgroundColor: '#E3F2FD',
                       marginTop: 8,
-                      marginLeft: 8,
                     }}
                   >
                     Administrador
                   </Chip>
-                )}
-              </View>
+                </View>
+              )}
             </View>
           </View>
         </Card.Content>
@@ -869,22 +1009,38 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
                       </View>
                     </View>
 
-                    {/* Receipt Button - Only for paid payments */}
-                    {!!isCompleted && (
-                      <Button
-                        mode="outlined"
-                        onPress={() => {
-                          const paymentIdNum = parseInt(payment.id.toString());
-                          setSelectedPayment(payment);
-                          setShowReceipt(paymentIdNum);
-                        }}
-                        style={{ marginTop: 12 }}
-                        icon="receipt"
-                        compact
-                      >
-                        Ver Comprovante
-                      </Button>
-                    )}
+                    {/* Action Buttons */}
+                    <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+                      {/* Receipt Button - Only for paid payments */}
+                      {!!isCompleted && (
+                        <Button
+                          mode="outlined"
+                          onPress={() => {
+                            const paymentIdNum = parseInt(payment.id.toString());
+                            setSelectedPayment(payment);
+                            setShowReceipt(paymentIdNum);
+                          }}
+                          icon="receipt"
+                          compact
+                          style={{ flex: 1 }}
+                        >
+                          Ver Comprovante
+                        </Button>
+                      )}
+                      
+                      {/* Mark as Paid Button - Only for pending/overdue payments */}
+                      {!isCompleted && (
+                        <Button
+                          mode="contained"
+                          onPress={() => handleMarkAsPaid(payment)}
+                          icon="check-circle"
+                          compact
+                          style={{ flex: 1 }}
+                        >
+                          Marcar como Pago
+                        </Button>
+                      )}
+                    </View>
                   </View>
                   {index < userPayments.length - 1 && <Divider style={{ marginVertical: 12 }} />}
                 </View>
@@ -894,6 +1050,117 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
             <View style={styles.noVehicles}>
               <Ionicons name="cash-outline" size={48} color="#ccc" />
               <Text style={styles.noVehiclesText}>Nenhum pagamento encontrado</Text>
+            </View>
+          )}
+        </Card.Content>
+      </Card>
+
+      {/* Payment History with Pagination */}
+      <Card style={styles.card}>
+        <Card.Content>
+          <Title style={styles.sectionTitle}>Histórico Detalhado</Title>
+          {historyTotal > 0 && (
+            <Text style={{ fontSize: 12, color: '#999', marginBottom: 12 }}>
+              {historyTotal} registros no total
+            </Text>
+          )}
+          
+          {loadingHistory ? (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+            </View>
+          ) : paymentHistory.length > 0 ? (
+            <>
+                {paymentHistory.map((historyItem: PaymentHistory, index: number) => {
+                  const isPaid = historyItem.status === 'paid' || historyItem.status === 'completed';
+                  
+                  return (
+                    <View key={historyItem.id || index}>
+                      <View style={{ padding: 12, backgroundColor: '#F5F5F5', borderRadius: 8 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <View style={{ flex: 1 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Text style={{ fontSize: 13, color: '#333', fontWeight: '600' }}>
+                                Status: {historyItem.status || 'N/A'}
+                              </Text>
+                              {isPaid ? (
+                                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                              ) : (
+                                <Ionicons name="time-outline" size={16} color="#FF9800" />
+                              )}
+                            </View>
+                            {!!historyItem.notes && (
+                              <Text style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
+                                {historyItem.notes}
+                              </Text>
+                            )}
+                            <Text style={{ fontSize: 11, color: '#999', marginTop: 2 }}>
+                              {formatDateTime(historyItem.created_at)}
+                            </Text>
+                          </View>
+                          
+                          {historyItem.amount && (
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.primary }}>
+                              {formatCurrency(historyItem.amount)}
+                            </Text>
+                          )}
+                        </View>
+                        
+                        {/* Botão Marcar como Pago - apenas se não estiver pago */}
+                        {!isPaid && (
+                          <Button
+                            mode="contained"
+                            onPress={() => handleMarkHistoryAsPaid(historyItem.payment_id)}
+                            icon="check-circle"
+                            compact
+                            style={{ marginTop: 12, backgroundColor: '#4CAF50' }}
+                          >
+                            Marcar como Pago
+                          </Button>
+                        )}
+                      </View>
+                      {index < paymentHistory.length - 1 && <Divider style={{ marginVertical: 8 }} />}
+                    </View>
+                  );
+                })}
+                
+                {/* Controles de Paginação */}
+                {historyTotalPages > 1 && (
+                  <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: 16, gap: 12 }}>
+                    <Button
+                      mode="outlined"
+                      onPress={() => setHistoryPage(historyPage - 1)}
+                      disabled={historyPage === 1 || loadingHistory}
+                      icon="chevron-left"
+                      compact
+                    >
+                      Anterior
+                    </Button>
+                    
+                    <Text style={{ fontSize: 13, color: '#666' }}>
+                      Página {historyPage} de {historyTotalPages}
+                    </Text>
+                    
+                    <Button
+                      mode="outlined"
+                      onPress={() => setHistoryPage(historyPage + 1)}
+                      disabled={historyPage >= historyTotalPages || loadingHistory}
+                      icon="chevron-right"
+                      contentStyle={{ flexDirection: 'row-reverse' }}
+                      compact
+                    >
+                      Próxima
+                    </Button>
+                  </View>
+                )}
+              </>
+          ) : (
+            <View style={styles.noVehicles}>
+              <Ionicons name="document-text-outline" size={48} color="#ccc" />
+              <Text style={styles.noVehiclesText}>Nenhum histórico encontrado</Text>
+              <Text style={{ fontSize: 12, color: '#999', marginTop: 8, textAlign: 'center' }}>
+                O histórico será exibido quando houver pagamentos registrados
+              </Text>
             </View>
           )}
         </Card.Content>
@@ -938,10 +1205,21 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
       <Portal>
         <Dialog visible={editPaymentVisible} onDismiss={closeEditPaymentDialog}>
           <Dialog.Title>Editar Valores de Pagamento</Dialog.Title>
+          
+          {/* Botões no Topo */}
+          <Dialog.Actions style={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 8 }}>
+            <Button onPress={closeEditPaymentDialog} disabled={savingPayment}>
+              Cancelar
+            </Button>
+            <Button onPress={savePaymentAmounts} disabled={savingPayment} loading={savingPayment} mode="contained">
+              Salvar
+            </Button>
+          </Dialog.Actions>
+
           <Dialog.Content>
-            <Text style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
-              Você pode atualizar apenas um dos valores ou ambos
-            </Text>
+                  <Text style={{ fontSize: 13, color: '#666', marginBottom: 12 }}>
+                    Você pode atualizar apenas um dos valores ou ambos
+                  </Text>
             <PaperTextInput
               label="Valor Semanal (R$) - Opcional"
               value={weeklyAmount}
@@ -962,21 +1240,29 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
               placeholder="Ex: 500.00"
             />
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={closeEditPaymentDialog} disabled={savingPayment}>
-              Cancelar
-            </Button>
-            <Button onPress={savePaymentAmounts} disabled={savingPayment} loading={savingPayment}>
-              Salvar
-            </Button>
-          </Dialog.Actions>
         </Dialog>
 
         {/* Edit User Info Dialog */}
         <Dialog visible={editUserVisible} onDismiss={closeEditUserDialog}>
           <Dialog.Title>Editar Informações do Usuário</Dialog.Title>
-          <Dialog.Content>
-            <PaperTextInput
+          
+          {/* Botões no Topo */}
+          <Dialog.Actions style={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 8 }}>
+            <Button onPress={closeEditUserDialog} disabled={savingUser}>
+              Cancelar
+            </Button>
+            <Button onPress={saveUserInfo} disabled={savingUser} loading={savingUser} mode="contained">
+              Salvar
+            </Button>
+          </Dialog.Actions>
+
+          <Dialog.ScrollArea>
+            <ScrollView 
+              style={{ maxHeight: 400 }} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+                    <PaperTextInput
               label="Nome"
               value={editName}
               onChangeText={setEditName}
@@ -990,8 +1276,19 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
               onChangeText={setEditEmail}
               keyboardType="email-address"
               mode="outlined"
+              autoCapitalize="none"
               style={{ marginBottom: 12 }}
               left={<PaperTextInput.Icon icon="email" />}
+            />
+            <PaperTextInput
+              label="CPF"
+              value={editCpf}
+              onChangeText={setEditCpf}
+              keyboardType="numeric"
+              mode="outlined"
+              style={{ marginBottom: 12 }}
+              left={<PaperTextInput.Icon icon="card-account-details" />}
+              placeholder="000.000.000-00"
             />
             <PaperTextInput
               label="Telefone"
@@ -1002,24 +1299,17 @@ export default function UserDetailsScreen({ route, navigation }: UserDetailsScre
               style={{ marginBottom: 12 }}
               left={<PaperTextInput.Icon icon="phone" />}
             />
-            <PaperTextInput
-              label="Endereço"
-              value={editAddress}
-              onChangeText={setEditAddress}
-              mode="outlined"
-              multiline
-              numberOfLines={2}
-              left={<PaperTextInput.Icon icon="map-marker" />}
-            />
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={closeEditUserDialog} disabled={savingUser}>
-              Cancelar
-            </Button>
-            <Button onPress={saveUserInfo} disabled={savingUser} loading={savingUser}>
-              Salvar
-            </Button>
-          </Dialog.Actions>
+              <PaperTextInput
+                label="Endereço"
+                value={editAddress}
+                onChangeText={setEditAddress}
+                mode="outlined"
+                multiline
+                numberOfLines={2}
+                left={<PaperTextInput.Icon icon="map-marker" />}
+              />
+            </ScrollView>
+          </Dialog.ScrollArea>
         </Dialog>
       </Portal>
     </ScrollView>

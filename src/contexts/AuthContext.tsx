@@ -53,6 +53,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<AuthResponse> => {
     try {
       setLoading(true);
+
+      // Small delay to ensure logout cleanup is complete if switching users
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       const result = await authService.login(email, password);
 
       if (result.success && result.user && result.token) {
@@ -91,14 +95,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       setLoading(true);
 
-      // Call logout service
+      // First, set authenticated to false to stop the token check interval
+      setIsAuthenticated(false);
+      setUser(null);
+
+      // Then call logout service (this will set the isLoggingOut flag)
       await authService.logout();
 
-      // Clear stored data
+      // Clear stored data (redundant but ensures cleanup)
       await clearAuthData();
-
-      setUser(null);
-      setIsAuthenticated(false);
     } catch (error) {
       console.error('Erro no logout:', error);
       // Force logout even if service call fails

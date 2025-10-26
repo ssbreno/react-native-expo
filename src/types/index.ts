@@ -70,6 +70,7 @@ export interface Vehicle {
   mileage?: number;
   fuel_type?: 'gasoline' | 'ethanol' | 'diesel' | 'electric' | 'hybrid' | 'flex';
   price: number;
+  weekly_cost?: number;
   status: 'ativo' | 'inativo' | 'available' | 'rented' | 'maintenance';
   description?: string;
   created_at: string;
@@ -216,8 +217,9 @@ export type RootStackParamList = {
   AdminDashboard: undefined;
   UsersList: undefined;
   UserDetails: { userId: string };
-  UpdateOverduePayments: undefined;
   VehiclesManagement: undefined;
+  VehicleDetails: { vehicleId: number };
+  VehicleCosts: undefined;
   VehicleDetail: { vehicleId: number };
   VehicleEdit: { vehicleId: number };
   ChangePassword: undefined;

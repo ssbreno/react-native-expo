@@ -230,34 +230,6 @@ describe('adminService', () => {
     });
   });
 
-  describe('updateOverduePayments', () => {
-    it('deve atualizar pagamentos vencidos com sucesso', async () => {
-      const mockResponse = {
-        data: {
-          message: 'Pagamentos atualizados',
-          updatedCount: 5,
-        },
-      };
-
-      mockedAxios.post.mockResolvedValueOnce(mockResponse);
-
-      const result = await adminService.updateOverduePayments();
-
-      expect(result.success).toBe(true);
-      expect(result.updatedCount).toBe(5);
-      expect(mockedAxios.post).toHaveBeenCalledWith('/admin/payments/update-overdue');
-    });
-
-    it('deve retornar erro ao falhar atualização', async () => {
-      mockedAxios.post.mockRejectedValueOnce(mockErrorResponse);
-
-      const result = await adminService.updateOverduePayments();
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBeTruthy();
-    });
-  });
-
   describe('getPaymentAnalytics', () => {
     it('deve buscar analytics de pagamentos', async () => {
       const mockAnalytics = {

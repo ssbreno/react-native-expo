@@ -47,7 +47,9 @@ export const adminService = {
 
   async getUsersWithPaymentStatus(): Promise<ApiResponse<AdminUser[]>> {
     try {
+      console.log('🔍 [AdminService] Calling /admin/users-payment-status');
       const response = await api.get('/admin/users-payment-status');
+      console.log('✅ [AdminService] getUsersWithPaymentStatus success');
       let users = response.data.users || response.data;
 
       if (users && Array.isArray(users)) {
@@ -89,7 +91,7 @@ export const adminService = {
     }
   },
 
-  async getWeeklyPaymentEvolution(weeks: number = 4): Promise<
+  async getWeeklyPaymentEvolution(month?: number, year?: number): Promise<
     ApiResponse<{
       weeks: Array<{
         week_number: number;
@@ -119,10 +121,19 @@ export const adminService = {
     }>
   > {
     try {
-      console.log(`📊 Fetching weekly payment evolution for ${weeks} weeks...`);
-      const response = await api.get(
-        `/admin/payments/weekly-evolution?weeks=${weeks}&details=true`
-      );
+      // Se mês e ano forem fornecidos, buscar semanas do mês específico
+      // Senão, buscar últimas 4 semanas (comportamento padrão)
+      let url = '/admin/payments/weekly-evolution?details=true';
+      
+      if (month !== undefined && year !== undefined) {
+        console.log(`📊 Fetching weekly payment evolution for ${month}/${year}...`);
+        url += `&month=${month}&year=${year}`;
+      } else {
+        console.log(`📊 Fetching weekly payment evolution for last 4 weeks...`);
+        url += `&weeks=4`;
+      }
+      
+      const response = await api.get(url);
       console.log('✅ Weekly evolution data received:', response.data);
       return { success: true, data: response.data };
     } catch (error: any) {
@@ -159,6 +170,11 @@ export const adminService = {
         },
       };
     } catch (error: any) {
+      console.error('❌ [AdminService] getAllUsers error:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        message: error.message
+      });
       return {
         success: false,
         error: error.response?.data?.error || 'Erro ao obter lista de usuários',
@@ -194,22 +210,6 @@ export const adminService = {
       return {
         success: false,
         error: error.response?.data?.error || 'Erro ao obter lista de pagamentos',
-      };
-    }
-  },
-
-  async updateOverduePayments(): Promise<ApiResponse<{ updated_count: number }>> {
-    try {
-      const response = await api.post('/admin/payments/update-overdue');
-      return {
-        success: true,
-        data: { updated_count: response.data.updated_count },
-        message: `${response.data.updated_count} pagamentos atualizados com sucesso`,
-      };
-    } catch (error: any) {
-      return {
-        success: false,
-        error: error.response?.data?.error || 'Erro ao atualizar pagamentos em atraso',
       };
     }
   },
@@ -371,7 +371,7 @@ export const adminService = {
 
   async updateUserInfo(
     userId: string,
-    data: { name: string; email: string; phone: string; address: string }
+    data: { name: string; email: string; phone: string; address: string; document_number?: string }
   ): Promise<ApiResponse> {
     try {
       console.log('🔄 [Admin] Atualizando usuário:', userId, data);
@@ -560,11 +560,11 @@ export const adminService = {
     limit = 50
   ): Promise<ApiResponse<{ payments: Payment[]; total: number }>> {
     try {
-      // Busca apenas pagamentos pagos (paid ou completed)
+      // Busca TODOS os pagamentos (paid, pending, overdue, etc)
       const response = await api.get(`/payments`, {
         params: {
           user_id: userId,
-          status: 'paid,completed', // Filtra apenas pagos
+          // Removido filtro de status para buscar TODOS os pagamentos
           page: page,
           limit: limit,
         },
@@ -581,6 +581,61 @@ export const adminService = {
       return {
         success: false,
         error: error.response?.data?.error || 'Erro ao buscar pagamentos do usuário',
+      };
+    }
+  },
+
+  /**
+   * Update payment status (admin only)
+   * PUT /payments/:id
+   */
+  async updatePaymentStatus(
+    paymentId: number,
+    status: 'pending' | 'paid' | 'completed' | 'failed' | 'cancelled'
+  ): Promise<ApiResponse<Payment>> {
+    try {
+      console.log(`💳 [Admin] Updating payment ${paymentId} status to ${status}`);
+      const response = await api.put(`/payments/${paymentId}`, { status });
+      console.log('✅ [Admin] Payment status updated successfully');
+      return {
+        success: true,
+        data: response.data,
+        message: response.data?.message || 'Status do pagamento atualizado com sucesso',
+      };
+    } catch (error: any) {
+      console.error('❌ [Admin] Error updating payment status:', error.response?.data || error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          'Erro ao atualizar status do pagamento',
+      };
+    }
+  },
+
+  /**
+   * Complete payment (mark as paid) - admin only
+   * POST /payments/:id/complete
+   */
+  async completePayment(paymentId: number): Promise<ApiResponse<Payment>> {
+    try {
+      console.log(`✅ [Admin] Completing payment ${paymentId}`);
+      const response = await api.post(`/payments/${paymentId}/complete`);
+      console.log('✅ [Admin] Payment completed successfully');
+      return {
+        success: true,
+        data: response.data,
+        message: response.data?.message || 'Pagamento marcado como pago',
+      };
+    } catch (error: any) {
+      console.error('❌ [Admin] Error completing payment:', error.response?.data || error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          'Erro ao marcar pagamento como pago',
       };
     }
   },

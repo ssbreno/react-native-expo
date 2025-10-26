@@ -94,6 +94,35 @@ export const vehicleService = {
   },
 
   /**
+   * Unassign vehicle from user (admin only)
+   * POST /vehicles/:id/unassign
+   */
+  async unassignVehicle(vehicleId: number): Promise<ApiResponse<{
+    message: string;
+    vehicle: Vehicle;
+  }>> {
+    try {
+      console.log(`🔓 [Vehicle] Unassigning vehicle ${vehicleId}`);
+      const response = await api.post(`/vehicles/${vehicleId}/unassign`);
+      console.log('✅ [Vehicle] Vehicle unassigned successfully');
+      return {
+        success: true,
+        data: response.data,
+        message: response.data.message || 'Veículo desvinculado com sucesso',
+      };
+    } catch (error: any) {
+      console.error('❌ [Vehicle] Error unassigning vehicle:', error.response?.data || error);
+      return {
+        success: false,
+        error:
+          error.response?.data?.error ||
+          error.response?.data?.message ||
+          'Erro ao desvincular veículo',
+      };
+    }
+  },
+
+  /**
    * Delete vehicle
    * DELETE /vehicles/:id
    */
@@ -118,14 +147,27 @@ export const vehicleService = {
     }
   },
 
-  async getVehicles(): Promise<ApiResponse<Vehicle[]>> {
+  async getVehicles(page = 1, limit = 10): Promise<ApiResponse<{
+    vehicles: Vehicle[];
+    total: number;
+    page: number;
+    limit: number;
+  }>> {
     try {
-      const response = await api.get('/vehicles');
+      console.log(`🚗 [Vehicle] Getting vehicles - Page ${page}, Limit ${limit}`);
+      const response = await api.get(`/vehicles?page=${page}&limit=${limit}`);
+      
       return {
         success: true,
-        data: response.data.vehicles || response.data,
+        data: {
+          vehicles: response.data.vehicles || [],
+          total: response.data.total || 0,
+          page: response.data.page || page,
+          limit: response.data.limit || limit,
+        },
       };
     } catch (error: any) {
+      console.error('❌ [Vehicle] Error getting vehicles:', error);
       return {
         success: false,
         error: error.response?.data?.error || 'Erro ao obter lista de veículos',
@@ -133,8 +175,9 @@ export const vehicleService = {
     }
   },
 
-  async getVehicleById(id: string): Promise<ApiResponse<Vehicle>> {
+  async getVehicleById(id: number | string): Promise<ApiResponse<Vehicle>> {
     try {
+      console.log(`🚗 [Vehicle] Getting vehicle by ID: ${id}`);
       const response = await api.get(`/vehicles/${id}`);
       return {
         success: true,

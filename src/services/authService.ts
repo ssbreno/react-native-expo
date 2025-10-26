@@ -1,10 +1,13 @@
-import api from './api';
+import api, { setLoggingOut, resetApiState } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { User, AuthResponse, ApiResponse } from '../types';
 
 export const authService = {
   async login(email: string, password: string): Promise<AuthResponse> {
     try {
+      // Reset API state before login to clear any previous user's state
+      resetApiState();
+
       const response = await api.post('/auth/login', { email, password });
       const { access_token, user, refresh_token } = response.data;
 
@@ -79,11 +82,28 @@ export const authService = {
     }
   },
 
-  async logout(): Promise<ApiResponse> {
+  async logout(clearSavedCredentials = false): Promise<ApiResponse> {
     try {
-      await AsyncStorage.multiRemove(['auth_token', 'user_data', 'refresh_token']);
+      // Signal that logout is in progress to prevent token refresh attempts
+      setLoggingOut(true);
+
+      // Clear all auth data
+      const keysToRemove = ['auth_token', 'user_data', 'refresh_token'];
+      
+      // Optionally clear saved credentials (remember me)
+      if (clearSavedCredentials) {
+        keysToRemove.push('@nanquim_saved_credentials');
+      }
+
+      await AsyncStorage.multiRemove(keysToRemove);
+
+      // Reset API state after clearing tokens
+      resetApiState();
+
       return { success: true };
     } catch (error) {
+      // Ensure API state is reset even on error
+      resetApiState();
       return { success: false, error: 'Erro ao fazer logout' };
     }
   },

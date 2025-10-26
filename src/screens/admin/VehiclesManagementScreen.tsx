@@ -36,6 +36,15 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterType, setFilterType] = useState('all');
+  
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalVehicles, setTotalVehicles] = useState(0);
+  const [itemsPerPage] = useState(10);
+  const [isLoadingPage, setIsLoadingPage] = useState(false);
+  
   const theme = useTheme();
 
   // Create Vehicle Modal
@@ -62,25 +71,41 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
 
-  // Filters
-  const [filterType, setFilterType] = useState('all'); // all, available, assigned
-
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = async () => {
+  const loadData = async (page = currentPage) => {
+    // Evitar múltiplas requisições simultâneas
+    if (isLoadingPage) {
+      console.log('⏳ [VehiclesManagement] Já está carregando, ignorando...');
+      return;
+    }
+
     try {
       setLoading(true);
+      setIsLoadingPage(true);
       const [vehiclesResult, availableResult, usersResult] = await Promise.all([
-        vehicleService.getVehicles(),
+        vehicleService.getVehicles(page, itemsPerPage), // Com paginação
         vehicleService.getAvailableVehicles(1, 100),
         adminService.getAllUsers(1, 1000),
       ]);
 
+      console.log('🚗 [VehiclesManagement] Loaded vehicles:', vehiclesResult.data?.vehicles?.length || 0);
+      console.log('📋 [VehiclesManagement] Pagination:', {
+        page: vehiclesResult.data?.page,
+        total: vehiclesResult.data?.total,
+        limit: vehiclesResult.data?.limit,
+      });
+
       if (vehiclesResult.success && vehiclesResult.data) {
-        setAllVehicles(vehiclesResult.data);
-        setVehicles(vehiclesResult.data);
+        const { vehicles, total, page: currentPageResponse, limit } = vehiclesResult.data;
+        setAllVehicles(vehicles || []);
+        setVehicles(vehicles || []);
+        setTotalVehicles(total || 0);
+        setCurrentPage(currentPageResponse || page);
+        setTotalPages(Math.ceil((total || 0) / (limit || itemsPerPage)));
+        console.log('🚗 [VehiclesManagement] Vehicle IDs:', vehicles?.map((v: any) => v.id));
       }
 
       if (availableResult.success && availableResult.data) {
@@ -95,6 +120,7 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
       Alert.alert('Erro', 'Erro ao carregar dados');
     } finally {
       setLoading(false);
+      setIsLoadingPage(false);
     }
   };
 
@@ -151,13 +177,17 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
 
     setCreating(true);
     try {
+      console.log('🚗 [VehiclesManagement] Creating vehicle:', newVehicleData.license_plate);
       const result = await vehicleService.createVehicle(newVehicleData);
 
       if (result.success) {
+        console.log('✅ [VehiclesManagement] Vehicle created, reloading data...');
         Alert.alert('Sucesso!', result.message || 'Veículo criado com sucesso');
         closeCreateVehicleModal();
-        loadData();
+        await loadData(); // Garantir que espera carregar
+        console.log('🔄 [VehiclesManagement] Data reloaded');
       } else {
+        console.error('❌ [VehiclesManagement] Failed to create vehicle:', result.error);
         Alert.alert('Erro', result.error || 'Erro ao criar veículo');
       }
     } catch (error) {
@@ -205,6 +235,57 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
     }
   };
 
+  const handleUnassignVehicle = (vehicleId: number, vehicleName: string) => {
+    Alert.alert(
+      'Desvincular Veículo',
+      `Tem certeza que deseja desvincular ${vehicleName}?\n\nO veículo ficará disponível novamente.`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Desvincular',
+          style: 'default',
+          onPress: async () => {
+            try {
+              console.log(`🔓 [VehiclesManagement] Unassigning vehicle ${vehicleId}`);
+              
+              // Log estado antes
+              const vehicleBefore = vehicles.find(v => v.id === vehicleId);
+              console.log('📋 [VehiclesManagement] Vehicle BEFORE unassign:', {
+                id: vehicleBefore?.id,
+                user_id: vehicleBefore?.user_id,
+                brand: vehicleBefore?.brand,
+              });
+              
+              const result = await vehicleService.unassignVehicle(vehicleId);
+              console.log('📊 [VehiclesManagement] Unassign result:', result);
+              
+              if (result.success) {
+                console.log('✅ [VehiclesManagement] Unassign successful, reloading data...');
+                await loadData();
+                
+                // Log estado depois
+                const vehicleAfter = vehicles.find(v => v.id === vehicleId);
+                console.log('📋 [VehiclesManagement] Vehicle AFTER reload:', {
+                  id: vehicleAfter?.id,
+                  user_id: vehicleAfter?.user_id,
+                  brand: vehicleAfter?.brand,
+                });
+                
+                Alert.alert('Sucesso!', result.message || 'Veículo desvinculado com sucesso');
+              } else {
+                console.error('❌ [VehiclesManagement] Unassign failed:', result.error);
+                Alert.alert('Erro', result.error || 'Erro ao desvincular veículo');
+              }
+            } catch (error) {
+              console.error('❌ [VehiclesManagement] Error unassigning vehicle:', error);
+              Alert.alert('Erro', 'Erro ao desvincular veículo');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeleteVehicle = (vehicleId: number, vehicleName: string) => {
     Alert.alert(
       'Deletar Veículo',
@@ -234,25 +315,36 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
 
   const filteredVehicles = allVehicles
     .filter(vehicle => {
-      // Filter by type
-      if (filterType === 'available' && vehicle.user_id) return false;
-      if (filterType === 'assigned' && !vehicle.user_id) return false;
+      // Filter by type - Considerar user_id null, undefined ou 0 como disponível
+      const isAvailable = !vehicle.user_id || vehicle.user_id === 0;
+      if (filterType === 'available' && !isAvailable) return false;
+      if (filterType === 'assigned' && isAvailable) return false;
 
       // Filter by search
+      if (!searchQuery.trim()) return true; // Se busca está vazia, mostrar todos
+      
       const searchLower = searchQuery.toLowerCase();
       return (
-        vehicle.brand.toLowerCase().includes(searchLower) ||
-        vehicle.model.toLowerCase().includes(searchLower) ||
-        vehicle.license_plate.toLowerCase().includes(searchLower) ||
-        (vehicle.color && vehicle.color.toLowerCase().includes(searchLower))
+        (vehicle.brand || '').toLowerCase().includes(searchLower) ||
+        (vehicle.model || '').toLowerCase().includes(searchLower) ||
+        (vehicle.license_plate || '').toLowerCase().includes(searchLower) ||
+        (vehicle.color || '').toLowerCase().includes(searchLower)
       );
     });
 
   const renderVehicleCard = (vehicle: Vehicle) => {
-    const isAvailable = !vehicle.user_id;
+    const isAvailable = !vehicle.user_id || vehicle.user_id === 0;
+    
+    // Encontrar usuário vinculado
+    const linkedUser = !isAvailable ? users.find(u => u.id === vehicle.user_id) : null;
 
     return (
-      <Card key={vehicle.id} style={styles.vehicleCard}>
+      <TouchableOpacity
+        key={vehicle.id}
+        activeOpacity={0.7}
+        onPress={() => navigation.navigate('VehicleDetails', { vehicleId: vehicle.id })}
+      >
+        <Card style={styles.vehicleCard}>
         <Card.Content>
           <View style={styles.vehicleHeader}>
             <View style={styles.vehicleInfo}>
@@ -272,6 +364,16 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
                 </Chip>
                 <Text style={styles.plateText}>{vehicle.license_plate}</Text>
               </View>
+              
+              {/* Mostrar nome do usuário vinculado */}
+              {linkedUser && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 8, backgroundColor: '#F5F5F5', padding: 8, borderRadius: 6 }}>
+                  <Ionicons name="person" size={16} color="#666" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, color: '#666', fontWeight: '500' }}>
+                    Vinculado com: <Text style={{ color: '#333', fontWeight: '600' }}>{linkedUser.name}</Text>
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
@@ -312,9 +414,15 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
                 Vincular
               </Button>
             ) : (
-              <Chip icon="person" style={styles.userChip}>
-                Usuário vinculado
-              </Chip>
+              <Button
+                mode="outlined"
+                onPress={() => handleUnassignVehicle(vehicle.id, `${vehicle.brand} ${vehicle.model}`)}
+                icon="link-off"
+                textColor="#FF9800"
+                style={[styles.actionBtn, { borderColor: '#FF9800' }]}
+              >
+                Desvincular
+              </Button>
             )}
             <Button
               mode="outlined"
@@ -328,6 +436,7 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
           </View>
         </Card.Content>
       </Card>
+      </TouchableOpacity>
     );
   };
 
@@ -345,7 +454,7 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
       <Surface style={styles.header}>
         <Title style={styles.headerTitle}>Gerenciamento de Veículos</Title>
         <Text style={styles.headerSubtitle}>
-          Total: {allVehicles.length} • Disponíveis: {availableVehicles.length}
+          Total: {totalVehicles} • Disponíveis: {allVehicles.filter(v => !v.user_id || v.user_id === 0).length}
         </Text>
       </Surface>
 
@@ -371,10 +480,68 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
         />
       </View>
 
+      {/* Botão Novo Veículo no Topo */}
+      <View style={{ paddingHorizontal: 16, paddingBottom: 12 }}>
+        <Button
+          mode="contained"
+          onPress={openCreateVehicleModal}
+          icon="plus"
+          style={{ borderRadius: 8 }}
+        >
+          Novo Veículo
+        </Button>
+      </View>
+
+      {/* Controles de Paginação no Topo */}
+      {totalPages > 1 && (
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, gap: 12 }}>
+          <Button
+            mode="outlined"
+            onPress={() => {
+              if (currentPage > 1 && !isLoadingPage) {
+                loadData(currentPage - 1);
+              }
+            }}
+            disabled={currentPage === 1 || isLoadingPage}
+            icon="chevron-left"
+            compact
+            loading={isLoadingPage && currentPage > 1}
+          >
+            Anterior
+          </Button>
+          
+          <View style={{ paddingHorizontal: 16 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: '#333', textAlign: 'center' }}>
+              Página {currentPage} de {totalPages}
+            </Text>
+            <Text style={{ fontSize: 12, color: '#999', textAlign: 'center' }}>
+              {totalVehicles} veículos no total
+            </Text>
+          </View>
+          
+          <Button
+            mode="outlined"
+            onPress={() => {
+              if (currentPage < totalPages && !isLoadingPage) {
+                loadData(currentPage + 1);
+              }
+            }}
+            disabled={currentPage >= totalPages || isLoadingPage}
+            icon="chevron-right"
+            contentStyle={{ flexDirection: 'row-reverse' }}
+            compact
+            loading={isLoadingPage && currentPage < totalPages}
+          >
+            Próxima
+          </Button>
+        </View>
+      )}
+
       <ScrollView
         style={styles.scrollView}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        {/* Lista de veículos */}
         {filteredVehicles.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="car-sport-outline" size={64} color="#ccc" />
@@ -385,21 +552,32 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
         )}
       </ScrollView>
 
-      {/* FAB Criar Veículo */}
-      <FAB
-        icon="plus"
-        label="Novo Veículo"
-        style={styles.fab}
-        onPress={openCreateVehicleModal}
-        color="#fff"
-      />
-
       {/* Modal Criar Veículo */}
       <Portal>
         <Dialog visible={createVehicleVisible} onDismiss={closeCreateVehicleModal}>
           <Dialog.Title>Criar Novo Veículo</Dialog.Title>
+          
+          {/* Botões no Topo */}
+          <Dialog.Actions style={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 8 }}>
+            <Button onPress={closeCreateVehicleModal} disabled={creating}>
+              Cancelar
+            </Button>
+            <Button
+              onPress={handleCreateVehicle}
+              disabled={creating}
+              loading={creating}
+              mode="contained"
+            >
+              Criar
+            </Button>
+          </Dialog.Actions>
+
           <Dialog.ScrollArea>
-            <ScrollView style={{ maxHeight: 500 }}>
+            <ScrollView 
+              style={{ maxHeight: 450 }} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               <SegmentedButtons
                 value={newVehicleData.vehicle_type}
                 onValueChange={value =>
@@ -510,24 +688,11 @@ export default function VehiclesManagementScreen({ navigation }: VehiclesManagem
                 disabled={creating}
               />
 
-              <Text style={{ fontSize: 12, color: '#666', marginTop: 8 }}>
+              <Text style={{ fontSize: 12, color: '#666', marginTop: 8, marginBottom: 16 }}>
                 * Campos obrigatórios
               </Text>
             </ScrollView>
           </Dialog.ScrollArea>
-          <Dialog.Actions>
-            <Button onPress={closeCreateVehicleModal} disabled={creating}>
-              Cancelar
-            </Button>
-            <Button
-              onPress={handleCreateVehicle}
-              disabled={creating}
-              loading={creating}
-              mode="contained"
-            >
-              Criar
-            </Button>
-          </Dialog.Actions>
         </Dialog>
       </Portal>
 

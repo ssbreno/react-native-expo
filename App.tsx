@@ -175,18 +175,26 @@ function AppNavigator() {
             }}
           />
           <Stack.Screen
-            name="UpdateOverduePayments"
-            component={require('./src/screens/admin/UpdateOverduePaymentsScreen').default}
-            options={{
-              title: 'Pagamentos Vencidos',
-              headerBackTitle: 'Voltar',
-            }}
-          />
-          <Stack.Screen
             name="VehiclesManagement"
             component={require('./src/screens/admin/VehiclesManagementScreen').default}
             options={{
               title: 'Gerenciar Veículos',
+              headerBackTitle: 'Voltar',
+            }}
+          />
+          <Stack.Screen
+            name="VehicleDetails"
+            component={require('./src/screens/admin/VehicleDetailsScreen').default}
+            options={{
+              title: 'Detalhes do Veículo',
+              headerBackTitle: 'Voltar',
+            }}
+          />
+          <Stack.Screen
+            name="VehicleCosts"
+            component={require('./src/screens/admin/VehicleCostsScreen').default}
+            options={{
+              title: 'Gerenciar Custos',
               headerBackTitle: 'Voltar',
             }}
           />
